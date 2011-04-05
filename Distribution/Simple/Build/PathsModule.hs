@@ -195,7 +195,7 @@ get_prefix_win32 =
   "getPrefixDirRel :: FilePath -> IO FilePath\n"++
   "getPrefixDirRel dirRel = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.\n"++
   "  where\n"++
-  "    try_size size = allocaArray size $ \\buf -> do\n"++
+  "    try_size size = allocaArray (fromIntegral size) $ \\buf -> do\n"++
   "        ret <- c_GetModuleFileName nullPtr buf size\n"++
   "        case ret of\n"++
   "          0 -> return (prefix `joinFileName` dirRel)\n"++
@@ -206,7 +206,7 @@ get_prefix_win32 =
   "            | otherwise  -> try_size (size * 2)\n"++
   "\n"++
   "foreign import stdcall unsafe \"windows.h GetModuleFileNameW\"\n"++
-  "  c_GetModuleFileName :: Ptr () -> CWString -> Int -> IO Int32\n"
+  "  c_GetModuleFileName :: Ptr () -> CWString -> Int32 -> IO Int32\n"
 
 get_prefix_hugs :: String
 get_prefix_hugs =
