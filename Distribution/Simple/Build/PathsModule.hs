@@ -76,12 +76,11 @@ generate pkg_descr lbi =
         "import Data.Version (Version(..))\n"++
         "import System.Environment (getEnv)"++
         "\n"++
-        "\nversion :: Version"++
-        "\nversion = " ++ show (packageVersion pkg_descr)++
-        "\n"++
-        "\n"++
         "catchIO :: IO a -> (Exception.IOException -> IO a) -> IO a\n"++
-        "catchIO = Exception.catch\n"
+        "catchIO = Exception.catch\n" ++
+        "\n"++
+        "\nversion :: Version"++
+        "\nversion = " ++ show (packageVersion pkg_descr)
 
        body
         | absolute =
