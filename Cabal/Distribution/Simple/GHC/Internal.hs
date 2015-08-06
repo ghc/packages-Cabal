@@ -25,12 +25,14 @@ module Distribution.Simple.GHC.Internal (
         getHaskellObjects,
         mkGhcOptPackages,
         substTopDir,
-        checkPackageDbEnvVar
+        checkPackageDbEnvVar,
+        profDetailLevelFlag,
  ) where
 
 import Distribution.Simple.GHC.ImplInfo ( GhcImplInfo (..) )
 import Distribution.Package
-         ( InstalledPackageId, PackageId )
+         ( InstalledPackageId, PackageId, LibraryName
+         , getHSLibraryName )
 import Distribution.InstalledPackageInfo
          ( InstalledPackageInfo )
 import qualified Distribution.InstalledPackageInfo as InstalledPackageInfo
@@ -41,10 +43,11 @@ import Distribution.PackageDescription as PD
 import Distribution.Compat.Exception ( catchExit, catchIO )
 import Distribution.Lex (tokenizeQuotedWords)
 import Distribution.Simple.Compiler
-         ( CompilerFlavor(..), Compiler(..), DebugInfoLevel(..), OptimisationLevel(..) )
+         ( CompilerFlavor(..), Compiler(..), DebugInfoLevel(..)
+         , OptimisationLevel(..), ProfDetailLevel(..) )
 import Distribution.Simple.Program.GHC
 import Distribution.Simple.Setup
-         ( toFlag )
+         ( Flag, toFlag )
 import qualified Distribution.ModuleName as ModuleName
 import Distribution.Simple.Program
          ( Program(..), ConfiguredProgram(..), ProgramConfiguration
@@ -54,8 +57,7 @@ import Distribution.Simple.Program
          , getProgramOutput )
 import Distribution.Simple.Program.Types ( suppressOverrideArgs )
 import Distribution.Simple.LocalBuildInfo
-         ( LocalBuildInfo(..), ComponentLocalBuildInfo(..)
-         , LibraryName(..) )
+         ( LocalBuildInfo(..), ComponentLocalBuildInfo(..) )
 import Distribution.Simple.Utils
 import Distribution.Simple.BuildPaths
 import Distribution.System ( buildOS, OS(..), Platform, platformFromTriple )
@@ -372,6 +374,10 @@ componentGhcOptions verbosity lbi bi clbi odir =
       ghcOptVerbosity       = toFlag verbosity,
       ghcOptHideAllPackages = toFlag True,
       ghcOptCabal           = toFlag True,
+      ghcOptPackageKey  = case clbi of
+        LibComponentLocalBuildInfo { componentPackageKey = pk } -> toFlag pk
+        _ -> mempty,
+      ghcOptSigOf           = hole_insts,
       ghcOptPackageDBs      = withPackageDB lbi,
       ghcOptPackages        = toNubListR $ mkGhcOptPackages clbi,
       ghcOptSplitObjs       = toFlag (splitObjs lbi),
@@ -407,6 +413,9 @@ componentGhcOptions verbosity lbi bi clbi odir =
     toGhcDebugInfo NormalDebugInfo  = toFlag True
     toGhcDebugInfo MaximalDebugInfo = toFlag True
 
+    hole_insts = map (\(k,(p,n)) -> (k, (InstalledPackageInfo.packageKey p,n)))
+                 (instantiatedWith lbi)
+
 -- | Strip out flags that are not supported in ghci
 filterGhciFlags :: [String] -> [String]
 filterGhciFlags = filter supported
@@ -421,7 +430,7 @@ filterGhciFlags = filter supported
     supported _           = True
 
 mkGHCiLibName :: LibraryName -> String
-mkGHCiLibName (LibraryName lib) = lib <.> "o"
+mkGHCiLibName lib = getHSLibraryName lib <.> "o"
 
 ghcLookupProperty :: String -> Compiler -> Bool
 ghcLookupProperty prop comp =
@@ -499,3 +508,14 @@ checkPackageDbEnvVar compilerName packagePathEnvVar = do
                ++ packagePathEnvVar ++ " is incompatible with Cabal. Use the "
                ++ "flag --package-db to specify a package database (it can be "
                ++ "used multiple times)."
+
+profDetailLevelFlag :: Bool -> ProfDetailLevel -> Flag GhcProfAuto
+profDetailLevelFlag forLib mpl =
+    case mpl of
+      ProfDetailNone                -> mempty
+      ProfDetailDefault | forLib    -> toFlag GhcProfAutoExported
+                        | otherwise -> toFlag GhcProfAutoToplevel
+      ProfDetailExportedFunctions   -> toFlag GhcProfAutoExported
+      ProfDetailToplevelFunctions   -> toFlag GhcProfAutoToplevel
+      ProfDetailAllFunctions        -> toFlag GhcProfAutoAll
+      ProfDetailOther _             -> mempty

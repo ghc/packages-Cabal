@@ -33,6 +33,7 @@ module Distribution.Simple.Configure (configure,
                                       checkPersistBuildConfigOutdated,
                                       tryGetPersistBuildConfig,
                                       maybeGetPersistBuildConfig,
+                                      findDistPref, findDistPrefOrDefault,
                                       localBuildInfoFile,
                                       getInstalledPackages, getPackageDBContents,
                                       configCompiler, configCompilerAux,
@@ -51,7 +52,7 @@ import Distribution.Compiler
 import Distribution.Utils.NubList
 import Distribution.Simple.Compiler
     ( CompilerFlavor(..), Compiler(..), compilerFlavor, compilerVersion
-    , compilerInfo
+    , compilerInfo, ProfDetailLevel(..), knownProfDetailLevels
     , showCompilerId, unsupportedLanguages, unsupportedExtensions
     , PackageDB(..), PackageDBStack, reexportedModulesSupported
     , packageKeySupported, renamingPackageFlagsSupported )
@@ -61,7 +62,7 @@ import Distribution.Package
     , packageName, packageVersion, Package(..)
     , Dependency(Dependency), simplifyDependency
     , InstalledPackageId(..), thisPackageVersion
-    , mkPackageKey, PackageKey(..), packageKeyLibraryName )
+    , mkPackageKey, packageKeyLibraryName )
 import qualified Distribution.InstalledPackageInfo as Installed
 import Distribution.InstalledPackageInfo (InstalledPackageInfo, emptyInstalledPackageInfo)
 import qualified Distribution.Simple.PackageIndex as PackageIndex
@@ -86,14 +87,13 @@ import Distribution.Simple.Program
     , userSpecifyArgss, userSpecifyPaths
     , lookupProgram, requireProgram, requireProgramVersion
     , pkgConfigProgram, gccProgram, rawSystemProgramStdoutConf )
-import Distribution.Simple.Setup
-    ( ConfigFlags(..), CopyDest(..), Flag(..), fromFlag, fromFlagOrDefault
-    , flagToMaybe )
+import Distribution.Simple.Setup as Setup
+    ( ConfigFlags(..), CopyDest(..), Flag(..), defaultDistPref
+    , fromFlag, fromFlagOrDefault, flagToMaybe, toFlag )
 import Distribution.Simple.InstallDirs
     ( InstallDirs(..), defaultInstallDirs, combineInstallDirs )
 import Distribution.Simple.LocalBuildInfo
     ( LocalBuildInfo(..), Component(..), ComponentLocalBuildInfo(..)
-    , LibraryName(..)
     , absoluteInstallDirs, prefixRelativeInstallDirs, inplacePackageId
     , ComponentName(..), showComponentName, pkgEnabledComponents
     , componentBuildInfo, componentName, checkComponentsCyclic )
@@ -158,6 +158,7 @@ import Distribution.Text
 import Text.PrettyPrint
     ( render, (<>), ($+$), char, text, comma
     , quotes, punctuate, nest, sep, hsep )
+import Distribution.Compat.Environment ( lookupEnv )
 import Distribution.Compat.Exception ( catchExit, catchIO )
 
 -- | The errors that can be thrown when reading the @setup-config@ file.
@@ -312,6 +313,30 @@ localBuildInfoFile distPref = distPref </> "setup-config"
 -- * Configuration
 -- -----------------------------------------------------------------------------
 
+-- | Return the \"dist/\" prefix, or the default prefix. The prefix is taken from
+-- (in order of highest to lowest preference) the override prefix, the \"CABAL_BUILDDIR\"
+-- environment variable, or the default prefix.
+findDistPref :: FilePath  -- ^ default \"dist\" prefix
+             -> Setup.Flag FilePath  -- ^ override \"dist\" prefix
+             -> IO FilePath
+findDistPref defDistPref overrideDistPref = do
+    envDistPref <- liftM parseEnvDistPref (lookupEnv "CABAL_BUILDDIR")
+    return $ fromFlagOrDefault defDistPref (mappend envDistPref overrideDistPref)
+  where
+    parseEnvDistPref env =
+      case env of
+        Just distPref | not (null distPref) -> toFlag distPref
+        _ -> NoFlag
+
+-- | Return the \"dist/\" prefix, or the default prefix. The prefix is taken from
+-- (in order of highest to lowest preference) the override prefix, the \"CABAL_BUILDDIR\"
+-- environment variable, or 'defaultDistPref' is used. Call this function to resolve a
+-- @*DistPref@ flag whenever it is not known to be set. (The @*DistPref@ flags are always
+-- set to a definite value before invoking 'UserHooks'.)
+findDistPrefOrDefault :: Setup.Flag FilePath  -- ^ override \"dist\" prefix
+                      -> IO FilePath
+findDistPrefOrDefault = findDistPref defaultDistPref
+
 -- |Perform the \"@.\/setup configure@\" action.
 -- Returns the @.setup-config@ file.
 configure :: (GenericPackageDescription, HookedBuildInfo)
@@ -319,7 +344,6 @@ configure :: (GenericPackageDescription, HookedBuildInfo)
 configure (pkg_descr0, pbi) cfg
   = do  let distPref = fromFlag (configDistPref cfg)
             buildDir' = distPref </> "build"
-            verbosity = fromFlag (configVerbosity cfg)
 
         setupMessage verbosity "Configuring" (packageId pkg_descr0)
 
@@ -539,27 +563,6 @@ configure (pkg_descr0, pbi) cfg
                          | (name, uses) <- inconsistencies
                          , (pkg, ver) <- uses ]
 
-        -- Calculate the package key.  We're going to store it in LocalBuildInfo
-        -- canonically, but ComponentsLocalBuildInfo also needs to know about it
-        -- XXX Do we need the internal deps?
-        -- NB: does *not* include holeDeps!
-        let pkg_key = mkPackageKey (packageKeySupported comp)
-                                   (package pkg_descr)
-                                   (map Installed.packageKey externalPkgDeps)
-                                   (map (\(k,(p,m)) -> (k,(Installed.packageKey p,m))) hole_insts)
-
-        -- internal component graph
-        buildComponents <-
-          case mkComponentsGraph pkg_descr internalPkgDeps of
-            Left  componentCycle -> reportComponentCycle componentCycle
-            Right components     ->
-              case mkComponentsLocalBuildInfo packageDependsIndex pkg_descr
-                                              internalPkgDeps externalPkgDeps holeDeps
-                                              (Map.fromList hole_insts)
-                                              pkg_key components of
-                Left  problems    -> reportModuleReexportProblems problems
-                Right components' -> return components'
-
         -- installation directories
         defaultDirs <- defaultInstallDirs flavor userInstall (hasLibs pkg_descr)
         let installDirs = combineInstallDirs fromFlagOrDefault
@@ -603,6 +606,16 @@ configure (pkg_descr0, pbi) cfg
 
         (pkg_descr', programsConfig''') <-
           configurePkgconfigPackages verbosity pkg_descr programsConfig''
+
+        -- internal component graph
+        buildComponents <-
+          case mkComponentsGraph pkg_descr internalPkgDeps of
+            Left  componentCycle -> reportComponentCycle componentCycle
+            Right components     ->
+              mkComponentsLocalBuildInfo comp packageDependsIndex pkg_descr
+                                         internalPkgDeps externalPkgDeps holeDeps
+                                         (Map.fromList hole_insts)
+                                         components
 
         split_objs <-
            if not (fromFlag $ configSplitObjs cfg)
@@ -656,10 +669,24 @@ configure (pkg_descr0, pbi) cfg
             ++ "is not being built. Linking will fail if any executables "
             ++ "depend on the library."
 
-        let withProf_ = fromFlagOrDefault False (configProf cfg)
-            withProfExe_ = fromFlagOrDefault withProf_ $ configProfExe cfg
-            withProfLib_ = fromFlagOrDefault withProfExe_ $ configProfLib cfg
-        when (withProfExe_ && not withProfLib_) $ warn verbosity $
+        -- The --profiling flag sets the default for both libs and exes,
+        -- but can be overidden by --library-profiling, or the old deprecated
+        -- --executable-profiling flag.
+        let profEnabledLibOnly = configProfLib cfg
+            profEnabledBoth    = fromFlagOrDefault False (configProf cfg)
+            profEnabledLib = fromFlagOrDefault profEnabledBoth profEnabledLibOnly
+            profEnabledExe = fromFlagOrDefault profEnabledBoth (configProfExe cfg)
+
+        -- The --profiling-detail and --library-profiling-detail flags behave
+        -- similarly
+        profDetailLibOnly <- checkProfDetail (configProfLibDetail cfg)
+        profDetailBoth    <- liftM (fromFlagOrDefault ProfDetailDefault)
+                                   (checkProfDetail (configProfDetail cfg))
+        let profDetailLib = fromFlagOrDefault profDetailBoth profDetailLibOnly
+            profDetailExe = profDetailBoth
+
+        when (profEnabledExe && not profEnabledLib) $
+          warn verbosity $
                "Executables will be built with profiling, but library "
             ++ "profiling is disabled. Linking will fail if any executables "
             ++ "depend on the library."
@@ -687,14 +714,15 @@ configure (pkg_descr0, pbi) cfg
                     installedPkgs       = packageDependsIndex,
                     pkgDescrFile        = Nothing,
                     localPkgDescr       = pkg_descr',
-                    pkgKey              = pkg_key,
                     instantiatedWith    = hole_insts,
                     withPrograms        = programsConfig''',
                     withVanillaLib      = fromFlag $ configVanillaLib cfg,
-                    withProfLib         = withProfLib_,
+                    withProfLib         = profEnabledLib,
                     withSharedLib       = withSharedLib_,
                     withDynExe          = withDynExe_,
-                    withProfExe         = withProfExe_,
+                    withProfExe         = profEnabledExe,
+                    withProfLibDetail   = profDetailLib,
+                    withProfExeDetail   = profDetailExe,
                     withOptimization    = fromFlag $ configOptimization cfg,
                     withDebugInfo       = fromFlag $ configDebugInfo cfg,
                     withGHCiLib         = fromFlagOrDefault ghciLibByDefault $
@@ -742,6 +770,8 @@ configure (pkg_descr0, pbi) cfg
         return lbi
 
     where
+      verbosity = fromFlag (configVerbosity cfg)
+
       addExtraIncludeLibDirs pkg_descr =
           let extraBi = mempty { extraLibDirs = configExtraLibDirs cfg
                                , PD.includeDirs = configExtraIncludeDirs cfg}
@@ -752,6 +782,15 @@ configure (pkg_descr0, pbi) cfg
           in pkg_descr{ library     = modifyLib        `fmap` library pkg_descr
                       , executables = modifyExecutable  `map`
                                       executables pkg_descr}
+
+      checkProfDetail (Flag (ProfDetailOther other)) = do
+        warn verbosity $
+             "Unknown profiling detail level '" ++ other
+          ++ "', using default.\n"
+          ++ "The profiling detail levels are: " ++ intercalate ", "
+             [ name | (name, _, _) <- knownProfDetailLevels ]
+        return (Flag ProfDetailDefault)
+      checkProfDetail other = return other
 
 mkProgramsConfig :: ConfigFlags -> ProgramConfiguration -> ProgramConfiguration
 mkProgramsConfig cfg initialProgramsConfig = programsConfig
@@ -1247,20 +1286,19 @@ reportComponentCycle cnames =
             [ "'" ++ showComponentName cname ++ "'"
             | cname <- cnames ++ [head cnames] ]
 
-mkComponentsLocalBuildInfo :: InstalledPackageIndex
+mkComponentsLocalBuildInfo :: Compiler
+                           -> InstalledPackageIndex
                            -> PackageDescription
                            -> [PackageId] -- internal package deps
                            -> [InstalledPackageInfo] -- external package deps
                            -> [InstalledPackageInfo] -- hole package deps
                            -> Map ModuleName (InstalledPackageInfo, ModuleName)
-                           -> PackageKey
                            -> [(Component, [ComponentName])]
-                           -> Either [(ModuleReexport, String)] -- errors
-                                     [(ComponentName, ComponentLocalBuildInfo,
-                                                      [ComponentName])] -- ok
-mkComponentsLocalBuildInfo installedPackages pkg_descr
+                           -> IO [(ComponentName, ComponentLocalBuildInfo,
+                                                  [ComponentName])]
+mkComponentsLocalBuildInfo comp installedPackages pkg_descr
                            internalPkgDeps externalPkgDeps holePkgDeps hole_insts
-                           pkg_key graph =
+                           graph =
     sequence
       [ do clbi <- componentLocalBuildInfo c
            return (componentName c, clbi, cdeps)
@@ -1281,12 +1319,24 @@ mkComponentsLocalBuildInfo installedPackages pkg_descr
                                                       (Installed.installedPackageId pkg) m)
                                       (Map.lookup n hole_insts)))
                         (PD.exposedSignatures lib)
-        reexports <- resolveModuleReexports installedPackages
-                                            (packageId pkg_descr)
-                                            externalPkgDeps lib
+        let mb_reexports = resolveModuleReexports installedPackages
+                                                  (packageId pkg_descr)
+                                                  externalPkgDeps lib
+        reexports <- case mb_reexports of
+            Left problems -> reportModuleReexportProblems problems
+            Right r -> return r
+
+        -- Calculate the version hash and package key.
+        let externalPkgs = selectSubset bi externalPkgDeps
+            pkg_key = mkPackageKey (packageKeySupported comp)
+                        (package pkg_descr)
+                        (map Installed.libraryName externalPkgs)
+            version_hash = packageKeyLibraryName (package pkg_descr) pkg_key
+
         return LibComponentLocalBuildInfo {
           componentPackageDeps = cpds,
-          componentLibraries   = [ LibraryName ("HS" ++ packageKeyLibraryName (package pkg_descr) pkg_key) ],
+          componentPackageKey = pkg_key,
+          componentLibraryName = version_hash,
           componentPackageRenaming = cprns,
           componentExposedModules = exports ++ reexports ++ esigs
         }
@@ -1314,8 +1364,6 @@ mkComponentsLocalBuildInfo installedPackages pkg_descr
                     | pkg <- selectSubset bi externalPkgDeps ]
                  ++ [ (inplacePackageId pkgid, pkgid)
                     | pkgid <- selectSubset bi internalPkgDeps ]
-                 ++ [ (Installed.installedPackageId pkg, packageId pkg)
-                    | pkg <- holePkgDeps ]
                else [ (Installed.installedPackageId pkg, packageId pkg)
                     | pkg <- externalPkgDeps ]
         cprns = if newPackageDepsBehaviour pkg_descr

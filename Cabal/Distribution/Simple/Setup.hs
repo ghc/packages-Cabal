@@ -57,7 +57,7 @@ module Distribution.Simple.Setup (
   buildOptions, haddockOptions, installDirsOptions,
   programConfigurationOptions, programConfigurationPaths',
 
-  defaultDistPref,
+  defaultDistPref, optionDistPref,
 
   Flag(..),
   toFlag,
@@ -85,6 +85,7 @@ import Distribution.Simple.Compiler
          ( CompilerFlavor(..), defaultCompilerFlavor, PackageDB(..)
          , DebugInfoLevel(..), flagToDebugInfoLevel
          , OptimisationLevel(..), flagToOptimisationLevel
+         , ProfDetailLevel(..), flagToProfDetailLevel
          , absolutePackageDBPath )
 import Distribution.Simple.Utils
          ( wrapText, wrapLine, lowercase, intercalate )
@@ -295,6 +296,10 @@ data ConfigFlags = ConfigFlags {
                                           -- executables.
     configProf          :: Flag Bool,     -- ^Enable profiling in the library
                                           -- and executables.
+    configProfDetail    :: Flag ProfDetailLevel, -- ^Profiling detail level
+                                          --  in the library and executables.
+    configProfLibDetail :: Flag ProfDetailLevel, -- ^Profiling  detail level
+                                                 -- in the library
     configConfigureArgs :: [String],      -- ^Extra arguments to @configure@
     configOptimization  :: Flag OptimisationLevel,  -- ^Enable optimization.
     configProgPrefix    :: Flag PathTemplate, -- ^Installed executable prefix.
@@ -351,10 +356,12 @@ defaultConfigFlags progConf = emptyConfigFlags {
     configDynExe       = Flag False,
     configProfExe      = NoFlag,
     configProf         = NoFlag,
+    configProfDetail   = NoFlag,
+    configProfLibDetail= NoFlag,
     configOptimization = Flag NormalOptimisation,
     configProgPrefix   = Flag (toPathTemplate ""),
     configProgSuffix   = Flag (toPathTemplate ""),
-    configDistPref     = Flag defaultDistPref,
+    configDistPref     = NoFlag,
     configVerbosity    = Flag normal,
     configUserInstall  = Flag False,           --TODO: reverse this
 #if defined(mingw32_HOST_OS)
@@ -463,7 +470,7 @@ configureOptions showOrParseArgs =
          (boolOpt [] [])
 
       ,option "" ["profiling"]
-         "Executable profiling (requires library profiling)"
+         "Executable and library profiling"
          configProf (\v flags -> flags { configProf = v })
          (boolOpt [] [])
 
@@ -471,6 +478,19 @@ configureOptions showOrParseArgs =
          "Executable profiling (DEPRECATED)"
          configProfExe (\v flags -> flags { configProfExe = v })
          (boolOpt [] [])
+
+      ,option "" ["profiling-detail"]
+         ("Profiling detail level for executable and library (default, " ++
+          "none, exported-functions, toplevel-functions,  all-functions).")
+         configProfDetail (\v flags -> flags { configProfDetail = v })
+         (reqArg' "level" (Flag . flagToProfDetailLevel)
+                          showProfDetailLevelFlag)
+
+      ,option "" ["library-profiling-detail"]
+         "Profiling detail level for libraries only."
+         configProfLibDetail (\v flags -> flags { configProfLibDetail = v })
+         (reqArg' "level" (Flag . flagToProfDetailLevel)
+                          showProfDetailLevelFlag)
 
       ,multiOption "optimization"
          configOptimization (\v flags -> flags { configOptimization = v })
@@ -646,6 +666,17 @@ showPackageDbList = map showPackageDb
     showPackageDb (Just UserPackageDB)          = "user"
     showPackageDb (Just (SpecificPackageDB db)) = db
 
+showProfDetailLevelFlag :: Flag ProfDetailLevel -> [String]
+showProfDetailLevelFlag dl =
+  case dl of
+    NoFlag                           -> []
+    Flag ProfDetailNone              -> ["none"]
+    Flag ProfDetailDefault           -> ["default"]
+    Flag ProfDetailExportedFunctions -> ["exported-functions"]
+    Flag ProfDetailToplevelFunctions -> ["toplevel-functions"]
+    Flag ProfDetailAllFunctions      -> ["all-functions"]
+    Flag (ProfDetailOther other)     -> [other]
+
 
 parseDependency :: Parse.ReadP r (PackageName, InstalledPackageId)
 parseDependency = do
@@ -743,6 +774,8 @@ instance Monoid ConfigFlags where
     configDynExe        = mempty,
     configProfExe       = mempty,
     configProf          = mempty,
+    configProfDetail    = mempty,
+    configProfLibDetail = mempty,
     configConfigureArgs = mempty,
     configOptimization  = mempty,
     configProgPrefix    = mempty,
@@ -786,6 +819,8 @@ instance Monoid ConfigFlags where
     configDynExe        = combine configDynExe,
     configProfExe       = combine configProfExe,
     configProf          = combine configProf,
+    configProfDetail    = combine configProfDetail,
+    configProfLibDetail = combine configProfLibDetail,
     configConfigureArgs = combine configConfigureArgs,
     configOptimization  = combine configOptimization,
     configProgPrefix    = combine configProgPrefix,
@@ -832,7 +867,7 @@ data CopyFlags = CopyFlags {
 defaultCopyFlags :: CopyFlags
 defaultCopyFlags  = CopyFlags {
     copyDest      = Flag NoCopyDest,
-    copyDistPref  = Flag defaultDistPref,
+    copyDistPref  = NoFlag,
     copyVerbosity = Flag normal
   }
 
@@ -895,7 +930,7 @@ data InstallFlags = InstallFlags {
 defaultInstallFlags :: InstallFlags
 defaultInstallFlags  = InstallFlags {
     installPackageDB = NoFlag,
-    installDistPref  = Flag defaultDistPref,
+    installDistPref  = NoFlag,
     installUseWrapper = Flag False,
     installInPlace    = Flag False,
     installVerbosity = Flag normal
@@ -977,7 +1012,7 @@ defaultSDistFlags :: SDistFlags
 defaultSDistFlags = SDistFlags {
     sDistSnapshot    = Flag False,
     sDistDirectory   = mempty,
-    sDistDistPref    = Flag defaultDistPref,
+    sDistDistPref    = NoFlag,
     sDistListSources = mempty,
     sDistVerbosity   = Flag normal
   }
@@ -1059,7 +1094,7 @@ defaultRegisterFlags = RegisterFlags {
     regGenScript   = Flag False,
     regGenPkgConf  = NoFlag,
     regInPlace     = Flag False,
-    regDistPref    = Flag defaultDistPref,
+    regDistPref    = NoFlag,
     regPrintId     = Flag False,
     regVerbosity   = Flag normal
   }
@@ -1186,7 +1221,7 @@ defaultHscolourFlags = HscolourFlags {
     hscolourExecutables = Flag False,
     hscolourTestSuites  = Flag False,
     hscolourBenchmarks  = Flag False,
-    hscolourDistPref    = Flag defaultDistPref,
+    hscolourDistPref    = NoFlag,
     hscolourVerbosity   = Flag normal
   }
 
@@ -1297,7 +1332,7 @@ defaultHaddockFlags  = HaddockFlags {
     haddockHscolour     = Flag False,
     haddockHscolourCss  = NoFlag,
     haddockContents     = NoFlag,
-    haddockDistPref     = Flag defaultDistPref,
+    haddockDistPref     = NoFlag,
     haddockKeepTempFiles= Flag False,
     haddockVerbosity    = Flag normal
   }
@@ -1463,7 +1498,7 @@ data CleanFlags = CleanFlags {
 defaultCleanFlags :: CleanFlags
 defaultCleanFlags  = CleanFlags {
     cleanSaveConf  = Flag False,
-    cleanDistPref  = Flag defaultDistPref,
+    cleanDistPref  = NoFlag,
     cleanVerbosity = Flag normal
   }
 
@@ -1530,7 +1565,7 @@ defaultBuildFlags :: BuildFlags
 defaultBuildFlags  = BuildFlags {
     buildProgramPaths = mempty,
     buildProgramArgs = [],
-    buildDistPref    = Flag defaultDistPref,
+    buildDistPref    = mempty,
     buildVerbosity   = Flag normal,
     buildNumJobs     = mempty,
     buildArgs        = []
@@ -1630,7 +1665,7 @@ defaultReplFlags :: ReplFlags
 defaultReplFlags  = ReplFlags {
     replProgramPaths = mempty,
     replProgramArgs = [],
-    replDistPref    = Flag defaultDistPref,
+    replDistPref    = NoFlag,
     replVerbosity   = Flag normal,
     replReload      = Flag False
   }
@@ -1759,7 +1794,7 @@ data TestFlags = TestFlags {
 
 defaultTestFlags :: TestFlags
 defaultTestFlags  = TestFlags {
-    testDistPref    = Flag defaultDistPref,
+    testDistPref    = NoFlag,
     testVerbosity   = Flag normal,
     testHumanLog    = toFlag $ toPathTemplate $ "$pkgid-$test-suite.log",
     testMachineLog  = toFlag $ toPathTemplate $ "$pkgid.log",
@@ -1878,7 +1913,7 @@ data BenchmarkFlags = BenchmarkFlags {
 
 defaultBenchmarkFlags :: BenchmarkFlags
 defaultBenchmarkFlags  = BenchmarkFlags {
-    benchmarkDistPref  = Flag defaultDistPref,
+    benchmarkDistPref  = NoFlag,
     benchmarkVerbosity = Flag normal,
     benchmarkOptions   = []
   }

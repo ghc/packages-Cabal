@@ -17,7 +17,8 @@ module Distribution.Client.Types where
 import Distribution.Package
          ( PackageName, PackageId, Package(..)
          , mkPackageKey, PackageKey, InstalledPackageId(..)
-         , HasInstalledPackageId(..), PackageInstalled(..) )
+         , HasInstalledPackageId(..), PackageInstalled(..)
+         , LibraryName, packageKeyLibraryName )
 import Distribution.InstalledPackageInfo
          ( InstalledPackageInfo )
 import Distribution.PackageDescription
@@ -38,7 +39,7 @@ import Distribution.Text (display)
 import qualified Distribution.InstalledPackageInfo as Info
 
 import Data.Map (Map)
-import Network.URI (URI)
+import Network.URI (URI, nullURI)
 import Data.ByteString.Lazy (ByteString)
 import Control.Exception
          ( SomeException )
@@ -154,7 +155,13 @@ instance HasInstalledPackageId ReadyPackage where
 readyPackageKey :: Compiler -> ReadyPackage -> PackageKey
 readyPackageKey comp (ReadyPackage pkg _ _ deps) =
     mkPackageKey (packageKeySupported comp) (packageId pkg)
-                 (map Info.packageKey (CD.nonSetupDeps deps)) []
+                 (map Info.libraryName (CD.nonSetupDeps deps))
+
+-- | Extracts a library name from ReadyPackage, a common operation needed
+-- to calculate build paths.
+readyLibraryName :: Compiler -> ReadyPackage -> LibraryName
+readyLibraryName comp ready@(ReadyPackage pkg _ _ _) =
+    packageKeyLibraryName (packageId pkg) (readyPackageKey comp ready)
 
 
 -- | Sometimes we need to convert a 'ReadyPackage' back to a
@@ -235,11 +242,28 @@ data PackageLocation local =
 data LocalRepo = LocalRepo
   deriving (Show,Eq)
 
-data RemoteRepo = RemoteRepo {
-    remoteRepoName :: String,
-    remoteRepoURI  :: URI
-  }
+data RemoteRepo =
+    RemoteRepo {
+      remoteRepoName     :: String,
+      remoteRepoURI      :: URI,
+      remoteRepoRootKeys :: (),
+
+      -- | Normally a repo just specifies an HTTP or HTTPS URI, but as a
+      -- special case we may know a repo supports both and want to try HTTPS
+      -- if we can, but still allow falling back to HTTP.
+      --
+      -- This field is not currently stored in the config file, but is filled
+      -- in automagically for known repos.
+      remoteRepoShouldTryHttps :: Bool
+    }
+
+  -- FIXME: discuss this type some more.
+
   deriving (Show,Eq,Ord)
+
+-- | Construct a partial 'RemoteRepo' value to fold the field parser list over.
+emptyRemoteRepo :: String -> RemoteRepo
+emptyRemoteRepo name = RemoteRepo name nullURI () False
 
 data Repo = Repo {
     repoKind     :: Either RemoteRepo LocalRepo,

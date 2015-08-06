@@ -72,6 +72,8 @@ import Distribution.Client.Dependency
 import Distribution.Client.Dependency.Types
          ( Solver(..) )
 import Distribution.Client.FetchUtils
+import Distribution.Client.HttpUtils
+         ( configureTransport, HttpTransport (..) )
 import qualified Distribution.Client.Haddock as Haddock (regenerateHaddockIndex)
 import Distribution.Client.IndexUtils as IndexUtils
          ( getSourcePackages, getInstalledPackages )
@@ -135,7 +137,7 @@ import Distribution.Simple.InstallDirs as InstallDirs
          , initialPathTemplateEnv, installDirsTemplateEnv )
 import Distribution.Package
          ( PackageIdentifier(..), PackageId, packageName, packageVersion
-         , Package(..), PackageKey
+         , Package(..), LibraryName
          , Dependency(..), thisPackageVersion, InstalledPackageId, installedPackageId )
 import qualified Distribution.PackageDescription as PackageDescription
 import Distribution.PackageDescription
@@ -228,7 +230,7 @@ install verbosity packageDBs repos comp platform conf useSandbox mSandboxPkgInfo
 -- TODO: Make InstallContext a proper data type with documented fields.
 -- | Common context for makeInstallPlan and processInstallPlan.
 type InstallContext = ( InstalledPackageIndex, SourcePackageDb
-                      , [UserTarget], [PackageSpecifier SourcePackage] )
+                      , [UserTarget], [PackageSpecifier SourcePackage], HttpTransport )
 
 -- TODO: Make InstallArgs a proper data type with documented fields or just get
 -- rid of it completely.
@@ -255,6 +257,7 @@ makeInstallContext verbosity
 
     installedPkgIndex <- getInstalledPackages verbosity comp packageDBs conf
     sourcePkgDb       <- getSourcePackages    verbosity repos
+    transport <- configureTransport verbosity (flagToMaybe (globalHttpTransport globalFlags))
 
     (userTargets, pkgSpecifiers) <- case mUserTargets of
       Nothing           ->
@@ -268,13 +271,13 @@ makeInstallContext verbosity
         let userTargets | null userTargets0 = [UserTargetLocalDir "."]
                         | otherwise         = userTargets0
 
-        pkgSpecifiers <- resolveUserTargets verbosity
+        pkgSpecifiers <- resolveUserTargets transport verbosity
                          (fromFlag $ globalWorldFile globalFlags)
                          (packageIndex sourcePkgDb)
                          userTargets
         return (userTargets, pkgSpecifiers)
 
-    return (installedPkgIndex, sourcePkgDb, userTargets, pkgSpecifiers)
+    return (installedPkgIndex, sourcePkgDb, userTargets, pkgSpecifiers, transport)
 
 -- | Make an install plan given install context and install arguments.
 makeInstallPlan :: Verbosity -> InstallArgs -> InstallContext
@@ -284,7 +287,7 @@ makeInstallPlan verbosity
    _, configFlags, configExFlags, installFlags,
    _)
   (installedPkgIndex, sourcePkgDb,
-   _, pkgSpecifiers) = do
+   _, pkgSpecifiers, _) = do
 
     solver <- chooseSolver verbosity (fromFlag (configSolver configExFlags))
               (compilerInfo comp)
@@ -300,7 +303,7 @@ processInstallPlan :: Verbosity -> InstallArgs -> InstallContext
 processInstallPlan verbosity
   args@(_,_, comp, _, _, _, _, _, _, _, installFlags, _)
   (installedPkgIndex, sourcePkgDb,
-   userTargets, pkgSpecifiers) installPlan = do
+   userTargets, pkgSpecifiers, _) installPlan = do
     checkPrintPlan verbosity comp installedPkgIndex installPlan sourcePkgDb
       installFlags pkgSpecifiers
 
@@ -687,7 +690,7 @@ reportPlanningFailure :: Verbosity -> InstallArgs -> InstallContext -> String ->
 reportPlanningFailure verbosity
   (_, _, comp, platform, _, _, _
   ,_, configFlags, _, installFlags, _)
-  (_, sourcePkgDb, _, pkgSpecifiers)
+  (_, sourcePkgDb, _, pkgSpecifiers, _)
   message = do
 
   when reportFailure $ do
@@ -713,7 +716,7 @@ reportPlanningFailure verbosity
     case logFile of
       Nothing -> return ()
       Just template -> forM_ pkgids $ \pkgid ->
-        let env = initialPathTemplateEnv pkgid dummyPackageKey
+        let env = initialPathTemplateEnv pkgid dummyLibraryName
                     (compilerInfo comp) platform
             path = fromPathTemplate $ substPathTemplate env template
         in  writeFile path message
@@ -722,10 +725,10 @@ reportPlanningFailure verbosity
     reportFailure = fromFlag (installReportPlanningFailure installFlags)
     logFile = flagToMaybe (installLogFile installFlags)
 
-    -- A PackageKey is calculated from the transitive closure of
+    -- A LibraryName is calculated from the transitive closure of
     -- dependencies, but when the solver fails we don't have that.
     -- So we fail.
-    dummyPackageKey = error "reportPlanningFailure: package key not available"
+    dummyLibraryName = error "reportPlanningFailure: library name not available"
 
 -- | If a 'PackageSpecifier' refers to a single package, return Just that package.
 theSpecifiedPackage :: Package pkg => PackageSpecifier pkg -> Maybe PackageId
@@ -990,7 +993,7 @@ data InstallMisc = InstallMisc {
 
 -- | If logging is enabled, contains location of the log file and the verbosity
 -- level for logging.
-type UseLogFile = Maybe (PackageIdentifier -> PackageKey -> FilePath, Verbosity)
+type UseLogFile = Maybe (PackageIdentifier -> LibraryName -> FilePath, Verbosity)
 
 performInstallations :: Verbosity
                      -> InstallArgs
@@ -1015,16 +1018,17 @@ performInstallations verbosity
   installLock  <- newLock -- serialise installation
   cacheLock    <- newLock -- serialise access to setup exe cache
 
+  transport <- configureTransport verbosity (flagToMaybe (globalHttpTransport globalFlags))
 
   executeInstallPlan verbosity comp jobControl useLogFile installPlan $ \rpkg ->
     -- Calculate the package key (ToDo: Is this right for source install)
-    let pkg_key = readyPackageKey comp rpkg in
+    let libname = readyLibraryName comp rpkg in
     installReadyPackage platform cinfo configFlags
                         rpkg $ \configFlags' src pkg pkgoverride ->
-      fetchSourcePackage verbosity fetchLimit src $ \src' ->
+      fetchSourcePackage transport verbosity fetchLimit src $ \src' ->
         installLocalPackage verbosity buildLimit
                             (packageId pkg) src' distPref $ \mpath ->
-          installUnpackedPackage verbosity buildLimit installLock numJobs pkg_key
+          installUnpackedPackage verbosity buildLimit installLock numJobs libname
                                  (setupScriptOptions installedPkgIndex cacheLock rpkg)
                                  miscOptions configFlags' installFlags haddockFlags
                                  cinfo platform pkg pkgoverride mpath useLogFile
@@ -1092,11 +1096,11 @@ performInstallations verbosity
           | parallelInstall                   = False
           | otherwise                         = False
 
-    substLogFileName :: PathTemplate -> PackageIdentifier -> PackageKey -> FilePath
-    substLogFileName template pkg pkg_key = fromPathTemplate
+    substLogFileName :: PathTemplate -> PackageIdentifier -> LibraryName -> FilePath
+    substLogFileName template pkg libname = fromPathTemplate
                                           . substPathTemplate env
                                           $ template
-      where env = initialPathTemplateEnv (packageId pkg) pkg_key
+      where env = initialPathTemplateEnv (packageId pkg) libname
                   (compilerInfo comp) platform
 
     miscOptions  = InstallMisc {
@@ -1111,7 +1115,7 @@ performInstallations verbosity
 
 executeInstallPlan :: Verbosity
                    -> Compiler
-                   -> JobControl IO (PackageId, PackageKey, BuildResult)
+                   -> JobControl IO (PackageId, LibraryName, BuildResult)
                    -> UseLogFile
                    -> InstallPlan
                    -> (ReadyPackage -> IO BuildResult)
@@ -1128,10 +1132,10 @@ executeInstallPlan verbosity comp jobCtl useLogFile plan0 installPkg =
             [ do info verbosity $ "Ready to install " ++ display pkgid
                  spawnJob jobCtl $ do
                    buildResult <- installPkg pkg
-                   return (packageId pkg, pkg_key, buildResult)
+                   return (packageId pkg, libname, buildResult)
             | pkg <- pkgs
             , let pkgid = packageId pkg
-                  pkg_key = readyPackageKey comp pkg ]
+                  libname = readyLibraryName comp pkg ]
 
           let taskCount' = taskCount + length pkgs
               plan'      = InstallPlan.processing pkgs plan
@@ -1139,8 +1143,8 @@ executeInstallPlan verbosity comp jobCtl useLogFile plan0 installPkg =
 
     waitForTasks taskCount plan = do
       info verbosity $ "Waiting for install task to finish..."
-      (pkgid, pkg_key, buildResult) <- collectJob jobCtl
-      printBuildResult pkgid pkg_key buildResult
+      (pkgid, libname, buildResult) <- collectJob jobCtl
+      printBuildResult pkgid libname buildResult
       let taskCount' = taskCount-1
           plan'      = updatePlan pkgid buildResult plan
       tryNewTasks taskCount' plan'
@@ -1160,8 +1164,8 @@ executeInstallPlan verbosity comp jobCtl useLogFile plan0 installPkg =
 
     -- Print build log if something went wrong, and 'Installed $PKGID'
     -- otherwise.
-    printBuildResult :: PackageId -> PackageKey -> BuildResult -> IO ()
-    printBuildResult pkgid pkg_key buildResult = case buildResult of
+    printBuildResult :: PackageId -> LibraryName -> BuildResult -> IO ()
+    printBuildResult pkgid libname buildResult = case buildResult of
         (Right _) -> notice verbosity $ "Installed " ++ display pkgid
         (Left _)  -> do
           notice verbosity $ "Failed to install " ++ display pkgid
@@ -1169,7 +1173,7 @@ executeInstallPlan verbosity comp jobCtl useLogFile plan0 installPkg =
             case useLogFile of
               Nothing                 -> return ()
               Just (mkLogFileName, _) -> do
-                let logName = mkLogFileName pkgid pkg_key
+                let logName = mkLogFileName pkgid libname
                 putStr $ "Build log ( " ++ logName ++ " ):\n"
                 printFile logName
 
@@ -1217,18 +1221,19 @@ installReadyPackage platform cinfo configFlags
       Right (desc, _) -> desc
 
 fetchSourcePackage
-  :: Verbosity
+  :: HttpTransport
+  -> Verbosity
   -> JobLimit
   -> PackageLocation (Maybe FilePath)
   -> (PackageLocation FilePath -> IO BuildResult)
   -> IO BuildResult
-fetchSourcePackage verbosity fetchLimit src installPkg = do
+fetchSourcePackage transport verbosity fetchLimit src installPkg = do
   fetched <- checkFetched src
   case fetched of
     Just src' -> installPkg src'
     Nothing   -> onFailure DownloadFailed $ do
                    loc <- withJobLimit fetchLimit $
-                            fetchPackage verbosity src
+                            fetchPackage transport verbosity src
                    installPkg loc
 
 
@@ -1317,7 +1322,7 @@ installUnpackedPackage
   -> JobLimit
   -> Lock
   -> Int
-  -> PackageKey
+  -> LibraryName
   -> SetupScriptOptions
   -> InstallMisc
   -> ConfigFlags
@@ -1330,7 +1335,7 @@ installUnpackedPackage
   -> Maybe FilePath -- ^ Directory to change to before starting the installation.
   -> UseLogFile -- ^ File to log output to (if any)
   -> IO BuildResult
-installUnpackedPackage verbosity buildLimit installLock numJobs pkg_key
+installUnpackedPackage verbosity buildLimit installLock numJobs libname
                        scriptOptions miscOptions
                        configFlags installFlags haddockFlags
                        cinfo platform pkg pkgoverride workingDir useLogFile = do
@@ -1392,7 +1397,7 @@ installUnpackedPackage verbosity buildLimit installLock numJobs pkg_key
           maybePkgConf <- maybeGenPkgConf mLogPath
 
           -- Actual installation
-          withWin32SelfUpgrade verbosity pkg_key configFlags cinfo platform pkg $ do
+          withWin32SelfUpgrade verbosity libname configFlags cinfo platform pkg $ do
             case rootCmd miscOptions of
               (Just cmd) -> reexec cmd
               Nothing    -> do
@@ -1442,7 +1447,7 @@ installUnpackedPackage verbosity buildLimit installLock numJobs pkg_key
           }
         where
           CompilerId flavor _ = compilerInfoId cinfo
-          env         = initialPathTemplateEnv pkgid pkg_key cinfo platform
+          env         = initialPathTemplateEnv pkgid libname cinfo platform
           userInstall = fromFlagOrDefault defaultUserInstall
                         (configUserInstall configFlags')
 
@@ -1476,7 +1481,7 @@ installUnpackedPackage verbosity buildLimit installLock numJobs pkg_key
       case useLogFile of
          Nothing                 -> return Nothing
          Just (mkLogFileName, _) -> do
-           let logFileName = mkLogFileName (packageId pkg) pkg_key
+           let logFileName = mkLogFileName (packageId pkg) libname
                logDir      = takeDirectory logFileName
            unless (null logDir) $ createDirectoryIfMissing True logDir
            logFileExists <- doesFileExist logFileName
@@ -1524,14 +1529,14 @@ onFailure result action =
 -- ------------------------------------------------------------
 
 withWin32SelfUpgrade :: Verbosity
-                     -> PackageKey
+                     -> LibraryName
                      -> ConfigFlags
                      -> CompilerInfo
                      -> Platform
                      -> PackageDescription
                      -> IO a -> IO a
 withWin32SelfUpgrade _ _ _ _ _ _ action | buildOS /= Windows = action
-withWin32SelfUpgrade verbosity pkg_key configFlags cinfo platform pkg action = do
+withWin32SelfUpgrade verbosity libname configFlags cinfo platform pkg action = do
 
   defaultDirs <- InstallDirs.defaultInstallDirs
                    compFlavor
@@ -1559,9 +1564,9 @@ withWin32SelfUpgrade verbosity pkg_key configFlags cinfo platform pkg action = d
         templateDirs   = InstallDirs.combineInstallDirs fromFlagOrDefault
                            defaultDirs (configInstallDirs configFlags)
         absoluteDirs   = InstallDirs.absoluteInstallDirs
-                           pkgid pkg_key
+                           pkgid libname
                            cinfo InstallDirs.NoCopyDest
                            platform templateDirs
         substTemplate  = InstallDirs.fromPathTemplate
                        . InstallDirs.substPathTemplate env
-          where env = InstallDirs.initialPathTemplateEnv pkgid pkg_key cinfo platform
+          where env = InstallDirs.initialPathTemplateEnv pkgid libname cinfo platform
