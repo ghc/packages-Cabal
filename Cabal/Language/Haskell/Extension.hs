@@ -714,6 +714,13 @@ data KnownExtension =
   -- * <http://www.haskell.org/ghc/docs/latest/html/users_guide/other-type-extensions.html#derive-any-class>
   | DeriveAnyClass
 
+  -- | Enable visible type application:
+  --
+  -- > show (read @Int 5)
+  --
+  -- * <http://www.haskell.org/ghc/docs/latest/html/users_guide/syntax-extns.html#visible-type-application>
+  | TypeApplications
+
   deriving (Generic, Show, Read, Eq, Ord, Enum, Bounded, Typeable, Data)
 
 instance Binary KnownExtension
