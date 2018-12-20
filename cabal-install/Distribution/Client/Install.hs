@@ -146,7 +146,7 @@ import Distribution.Types.Dependency
          ( thisPackageVersion )
 import Distribution.Types.GivenComponent
          ( GivenComponent(..) )
-import Distribution.Types.PackageVersionConstraint
+import Distribution.Client.PackageVersionConstraint
          ( PackageVersionConstraint(..) )
 import Distribution.Types.MungedPackageId
 import qualified Distribution.PackageDescription as PackageDescription
