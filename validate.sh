@@ -1,69 +1,39 @@
 #!/bin/sh
 # shellcheck disable=SC2086
 
+# default config
+#######################################################################
+
+HC=ghc-8.2.2
+JOBS=4
+CABALTESTS=true
+CABALINSTALLTESTS=true
+CABALSUITETESTS=true
+CABALONLY=false
+
 # Help
-if [ "$1" = "help" ]; then
+#######################################################################
+
+show_usage() {
 cat <<EOF
-This is a helper script to build and run tests locally.
-It does about the same things as appveyor.yml, only using cabal new-build.
+./validate.sh - build & test
 
-Simple usage:
+Usage: ./validate.sh [ -j JOBS | -l | -C | -c | -s | -w HC ]
+  A script which runs all the tests.
 
-    $ HC=ghc-7.10.3 sh validate.sh
-
-Multiple ghcs (serial), this takes very long.
-
-    $ sh validate.sh ghc-7.6.3 ghc-7.8.4 ghc-7.10.3 ghc-8.0.2 ghc-8.2.2
-
-Params (with defaults)
-
-    JOBS=-j4                 cabal new-build -j argument
-    TESTSUITEJOBS=-j3        cabal-tests -j argument
-    CABALTESTS=true          Run Cabal tests
-    CABALINSTALLTESTS=true   Run cabal-install tests
-    CABALSUITETESTS=true     Run cabal-testsuite
-    CABAL_LIB_ONLY=true      Validate only Cabal-the-library
+Available options:
+  -j JOBS    cabal v2-build -j argument (default: $JOBS)
+  -l         Test Cabal-the-library only (default: $CABALONLY)
+  -C         Don't run Cabal tests (default: $CABALTESTS)
+  -c         Don't run cabal-install tests (default: $CABALINSTALLTESTS)
+  -s         Don't run cabal-testsuite tests (default: $CABALSUITETESTS)
+  -w HC      With compiler
 EOF
 exit 0
-fi
+}
 
-# Loop thru compilers if given as an argument
-if [ $# -ne 0 ]; then
-    set -e
-    for HC in "$@"; do
-        export HC
-        sh $0
-    done
-    exit 0
-fi
-
-HC=${HC-ghc-8.2.2}
-JOBS=${JOBS--j4}
-TESTSUITEJOBS=${TESTSUITEJOBS--j3}
-
-CABALTESTS=${CABALTESTS-true}
-CABALINSTALLTESTS=${CABALINSTALLTESTS-true}
-CABALSUITETESTS=${CABALSUITETESTS-true}
-CABAL_LIB_ONLY=${CABAL_LIB_ONLY-false}
-
-CABAL_VERSION="2.5.0.0"
-if [ "$(uname)" = "Linux" ]; then
-    ARCH="x86_64-linux"
-else
-    ARCH="x86_64-osx"
-fi
-
-if $CABAL_LIB_ONLY; then
-	PROJECTFILE=cabal.project.validate.libonly
-else
-	PROJECTFILE=cabal.project.validate
-fi
-
-BUILDDIR=dist-newstyle-validate-$HC
-CABAL_TESTSUITE_BDIR="$(pwd)/$BUILDDIR/build/$ARCH/$HC/cabal-testsuite-${CABAL_VERSION}"
-
-CABALNEWBUILD="cabal new-build $JOBS -w $HC --builddir=$BUILDDIR --project-file=$PROJECTFILE"
-CABALPLAN="cabal-plan --builddir=$BUILDDIR"
+# "library"
+#######################################################################
 
 OUTPUT=$(mktemp)
 
@@ -116,22 +86,96 @@ footer() {
     JOB_END_TIME=$(date +%s)
     tduration=$((JOB_END_TIME - JOB_START_TIME))
 
-    echo "$CYAN=== completed=== ======================================= $(date +%T) === $RESET"
+    echo "$CYAN=== END ============================================ $(date +%T) === $RESET"
     echo "$CYAN!!! Validation took $tduration seconds. $RESET"
 }
 
+# getopt
+#######################################################################
 
-# Info
-echo "$CYAN!!! Validating with $HC $RESET"
+while getopts 'j:lCcsw:' flag; do
+    case $flag in
+        j) JOBS="$OPTARG"
+            ;;
+        l) CABALONLY=true
+            ;;
+        C) CABALTESTS=false
+            ;;
+        c) CABALINSTALLTESTS=false
+            ;;
+        s) CABALSUITETESTS=false
+            ;;
+        w) HC="$OPTARG"
+            ;;
+        ?) show_usage
+            ;;
+    esac
+done
+
+shift $((OPTIND - 1))
+
+# header
+#######################################################################
+
+if [ "xhelp" = "x$1" ]; then
+    show_usage;
+fi
+
+TESTSUITEJOBS="-j$JOBS"
+JOBS="-j$JOBS"
+
+echo "$CYAN=== validate.sh ======================================== $(date +%T) === $RESET"
+
+cat <<EOF
+compiler:            $HC
+jobs:                $JOBS
+Cabal tests:         $CABALTESTS
+cabal-install tests: $CABALINSTALLTESTS
+cabal-testsuite:     $CABALSUITETESTS
+library only:        $CABALONLY
+
+EOF
 
 timed $HC --version
 timed cabal --version
 timed cabal-plan --version
 
-if ! $CABAL_LIB_ONLY; then
-	timed make cabal-install-dev
+# Basic setup
+#######################################################################
+
+# NOTE: This should match cabal-testsuite version
+CABAL_VERSION="2.5.0.0"
+
+if [ "$(uname)" = "Linux" ]; then
+    ARCH="x86_64-linux"
+else
+    ARCH="x86_64-osx"
 fi
 
+if $CABALONLY; then
+    PROJECTFILE=cabal.project.validate.libonly
+else
+    PROJECTFILE=cabal.project.validate
+fi
+
+BASEHC=$(basename $HC)
+BUILDDIR=dist-newstyle-validate-$BASEHC
+CABAL_TESTSUITE_BDIR="$(pwd)/$BUILDDIR/build/$ARCH/$BASEHC/cabal-testsuite-${CABAL_VERSION}"
+
+CABALNEWBUILD="cabal v2-build $JOBS -w $HC --builddir=$BUILDDIR --project-file=$PROJECTFILE"
+CABALPLAN="cabal-plan --builddir=$BUILDDIR"
+
+# SCRIPT
+#######################################################################
+
+echo "$CYAN=== cabal-install-dev ================================== $(date +%T) === $RESET"
+
+if ! $CABALONLY; then
+    timed make cabal-install-dev
+fi
+
+# Cabal lib
+#######################################################################
 
 echo "$CYAN=== Cabal: build ======================================= $(date +%T) === $RESET"
 
@@ -145,7 +189,6 @@ echo "$CYAN=== Cabal: test ======================================== $(date +%T) 
 timed $CABALNEWBUILD Cabal:tests --enable-tests --disable-benchmarks --dry-run || exit 1
 timed $CABALNEWBUILD Cabal:tests --enable-tests --disable-benchmarks --dep || exit 1
 timed $CABALNEWBUILD Cabal:tests --enable-tests --disable-benchmarks || exit 1
-rm -rf .ghc.environment.*
 
 CMD="$($CABALPLAN list-bin Cabal:test:unit-tests) $TESTSUITEJOBS --hide-successes"
 (cd Cabal && timed $CMD) || exit 1
@@ -163,6 +206,7 @@ CMD=$($CABALPLAN list-bin Cabal:test:hackage-tests)
 
 fi # $CABALTESTS
 
+if $CABALSUITETESTS; then
 
 echo "$CYAN=== cabal-testsuite: build ============================= $(date +%T) === $RESET"
 
@@ -170,22 +214,21 @@ timed $CABALNEWBUILD cabal-testsuite --enable-tests --disable-benchmarks --dry-r
 timed $CABALNEWBUILD cabal-testsuite --enable-tests --disable-benchmarks --dep || exit 1
 timed $CABALNEWBUILD cabal-testsuite --enable-tests --disable-benchmarks || exit 1
 
-if $CABALSUITETESTS; then
 echo "$CYAN=== cabal-testsuite: Cabal test ======================== $(date +%T) === $RESET"
 
 CMD="$($CABALPLAN list-bin cabal-testsuite:exe:cabal-tests) --builddir=$CABAL_TESTSUITE_BDIR $TESTSUITEJOBS --hide-successes"
-(cd cabal-testsuite && timed $CMD) || echo "to rerun cabal-tests: $CMD" && exit 1
+(cd cabal-testsuite && timed $CMD) || exit 1
 
 fi # CABALSUITETESTS (Cabal)
 
-
 # If testing only library, stop here
-if $CABAL_LIB_ONLY; then
-	footer
-	exit
+if $CABALONLY; then
+    footer
+    exit
 fi
 
-
+# cabal-install
+#######################################################################
 
 echo "$CYAN=== cabal-install: build =============================== $(date +%T) === $RESET"
 
@@ -194,7 +237,6 @@ timed $CABALNEWBUILD cabal-install --enable-tests --disable-benchmarks --dry-run
 # For some reason this sometimes fails. So we try twice.
 CMD="$CABALNEWBUILD cabal-install --enable-tests --disable-benchmarks"
 (timed $CMD) || (timed $CMD) || exit 1
-rm -rf .ghc.environment.*
 
 
 if $CABALINSTALLTESTS; then
@@ -227,6 +269,9 @@ CMD="$($CABALPLAN list-bin cabal-testsuite:exe:cabal-tests) --builddir=$CABAL_TE
 
 fi # CABALSUITETESTS
 
-
 # END
+#######################################################################
+
 footer
+
+#######################################################################
