@@ -110,6 +110,7 @@ buildAction
   , (configFlags, configExFlags, installFlags, haddockFlags, testFlags))
             targetStrings globalFlags = do
     -- TODO: This flags defaults business is ugly
+    print configFlags
     let onlyConfigure = fromFlag (buildOnlyConfigure defaultBuildFlags
                                  <> buildOnlyConfigure buildFlags)
         targetAction

@@ -44,6 +44,8 @@ module Distribution.Client.Config (
     remoteRepoFields
   ) where
 
+import Debug.Trace
+
 import Language.Haskell.Extension ( Language(Haskell2010) )
 
 import Distribution.Deprecated.ViewAsFieldDescr
@@ -391,7 +393,7 @@ instance Semigroup SavedConfig where
         configCID                 = combine configCID,
         configDistPref            = combine configDistPref,
         configCabalFilePath       = combine configCabalFilePath,
-        configVerbosity           = combine configVerbosity,
+        configVerbosity           = traceShowId $ combineTr configVerbosity,
         configUserInstall         = combine configUserInstall,
         -- TODO: NubListify
         configPackageDBs          = lastNonEmpty configPackageDBs,
@@ -417,6 +419,11 @@ instance Semigroup SavedConfig where
         }
         where
           combine        = combine'        savedConfigureFlags
+          combineTr = combineTr' savedConfigureFlags
+          combineTr' :: Show a => (SavedConfig -> flags) -> (flags -> Flag a) -> Flag a
+          combineTr'        field subfield =
+            (traceShowId $ subfield . field $ a) `mappend` (traceShowId $ subfield . field $ b)
+
           lastNonEmpty   = lastNonEmpty'   savedConfigureFlags
           lastNonEmptyNL = lastNonEmptyNL' savedConfigureFlags
           lastNonMempty  = lastNonMempty'  savedConfigureFlags
@@ -526,8 +533,7 @@ baseSavedConfig = do
   return mempty {
     savedConfigureFlags  = mempty {
       configHcFlavor     = toFlag defaultCompiler,
-      configUserInstall  = toFlag defaultUserInstall,
-      configVerbosity    = toFlag normal
+      configUserInstall  = toFlag defaultUserInstall
     },
     savedUserInstallDirs = mempty {
       prefix             = toFlag (toPathTemplate userPrefix)
