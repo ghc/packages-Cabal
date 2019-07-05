@@ -8,4 +8,4 @@ build-depends: base ^>= 4.0
 import Prelude
 
 main :: IO ()
-main = return ()
+main = putStrLn "Hello World"
