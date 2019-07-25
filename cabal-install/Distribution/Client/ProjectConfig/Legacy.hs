@@ -29,6 +29,7 @@ import Distribution.Client.ProjectConfig.Types
 import Distribution.Client.Types
          ( RemoteRepo(..), emptyRemoteRepo
          , AllowNewer(..), AllowOlder(..) )
+import Distribution.Client.SourceRepo (sourceRepositoryPackageGrammar, SourceRepoList)
 
 import Distribution.Client.Config
          ( SavedConfig(..), remoteRepoFields )
@@ -41,9 +42,7 @@ import Distribution.Solver.Types.ConstraintSource
 
 import Distribution.Package
 import Distribution.PackageDescription
-         ( SourceRepo(..), RepoKind(..)
-         , dispFlagAssignment )
-import Distribution.PackageDescription.FieldGrammar (sourceRepoFieldGrammar)
+         ( dispFlagAssignment )
 import Distribution.Simple.Compiler
          ( OptimisationLevel(..), DebugInfoLevel(..) )
 import Distribution.Simple.InstallDirs ( CopyDest (NoCopyDest) )
@@ -90,6 +89,7 @@ import Distribution.Types.PackageVersionConstraint
          ( PackageVersionConstraint )
 
 import qualified Data.Map as Map
+
 ------------------------------------------------------------------
 -- Representing the project config file in terms of legacy types
 --
@@ -106,7 +106,7 @@ import qualified Data.Map as Map
 data LegacyProjectConfig = LegacyProjectConfig {
        legacyPackages          :: [String],
        legacyPackagesOptional  :: [String],
-       legacyPackagesRepo      :: [SourceRepo],
+       legacyPackagesRepo      :: [SourceRepoList],
        legacyPackagesNamed     :: [PackageVersionConstraint],
 
        legacySharedConfig      :: LegacySharedConfig,
@@ -1195,7 +1195,7 @@ legacyPackageConfigSectionDescrs =
 packageRepoSectionDescr :: FGSectionDescr LegacyProjectConfig
 packageRepoSectionDescr = FGSectionDescr
   { fgSectionName        = "source-repository-package"
-  , fgSectionGrammar     = sourceRepoFieldGrammar (RepoKindUnknown "unused")
+  , fgSectionGrammar     = sourceRepositoryPackageGrammar
   , fgSectionGet         = map (\x->("", x)) . legacyPackagesRepo
   , fgSectionSet         =
         \lineno unused pkgrepo projconf -> do
