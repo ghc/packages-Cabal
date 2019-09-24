@@ -6,6 +6,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies        #-}
 {-# LANGUAGE TypeOperators       #-}
+#if __GLASGOW_HASKELL__ >= 711
+{-# LANGUAGE PatternSynonyms #-}
+#endif
 -- |
 --
 -- Copyright: (c) 2019 Oleg Grenrus
@@ -65,7 +68,6 @@ import Data.Int                           (Int16, Int32, Int64, Int8)
 import Data.List.NonEmpty                 (NonEmpty)
 import Data.Proxy                         (Proxy (..))
 import Data.Ratio                         (Ratio)
-import Data.Tagged                        (Tagged (..), untag)
 import Data.Typeable                      (Typeable)
 import Data.Word                          (Word, Word16, Word32, Word64, Word8)
 
@@ -187,6 +189,8 @@ class Structured a where
     structureHash' :: Tagged a MD5
     structureHash' = Tagged (hashStructure (structure (Proxy :: Proxy a)))
 
+-- private Tagged
+newtype Tagged a b = Tagged { untag :: b }
 
 -- | Semantically @'hashStructure' . 'structure'@.
 structureHash :: forall a. Structured a => Proxy a -> MD5
@@ -380,4 +384,3 @@ instance Structured Time.TimeOfDay       where structure = nominalStructure
 instance Structured Time.LocalTime       where structure = nominalStructure
 
 instance Structured (Proxy a)
-instance Structured a => Structured (Tagged b a)
