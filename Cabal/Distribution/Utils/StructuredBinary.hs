@@ -202,7 +202,7 @@ structureHash _ = untag (structureHash' :: Tagged a MD5)
 
 -- | Structured 'Binary.encode'.
 -- Encode a value to using binary serialisation to a lazy 'LBS.ByteString'.
--- Encoding starts with 20 byte large structure hash.
+-- Encoding starts with 16 byte large structure hash.
 structuredEncode
   :: forall a. (Binary.Binary a, Structured a)
   => a -> LBS.ByteString
