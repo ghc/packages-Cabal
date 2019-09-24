@@ -307,6 +307,7 @@ library
     Distribution.Utils.IOData
     Distribution.Utils.LogProgress
     Distribution.Utils.MapAccum
+    Distribution.Utils.StructuredBinary
     Distribution.Compat.CreatePipe
     Distribution.Compat.Directory
     Distribution.Compat.Environment
