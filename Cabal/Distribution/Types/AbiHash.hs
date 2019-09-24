@@ -51,7 +51,7 @@ instance IsString AbiHash where
     fromString = mkAbiHash
 
 instance Binary AbiHash
-
+instance Structured AbiHash
 instance NFData AbiHash where rnf = genericRnf
 
 instance Pretty AbiHash where

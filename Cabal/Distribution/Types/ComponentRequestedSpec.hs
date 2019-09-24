@@ -67,7 +67,9 @@ data ComponentRequestedSpec
                              , benchmarksRequested :: Bool }
     | OneComponentRequestedSpec ComponentName
   deriving (Generic, Read, Show, Eq)
+
 instance Binary ComponentRequestedSpec
+instance Structured ComponentRequestedSpec
 
 -- | The default set of enabled components.  Historically tests and
 -- benchmarks are NOT enabled by default.

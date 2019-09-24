@@ -60,6 +60,8 @@ simpleLicenseExpression i = ELicense (ELicenseId i) Nothing
 
 instance Binary LicenseExpression
 instance Binary SimpleLicenseExpression
+instance Structured LicenseExpression
+instance Structured SimpleLicenseExpression
 
 instance Pretty LicenseExpression where
     pretty = go 0

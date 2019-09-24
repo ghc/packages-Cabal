@@ -103,6 +103,7 @@ data Compiler = Compiler {
     deriving (Eq, Generic, Typeable, Show, Read)
 
 instance Binary Compiler
+instance Structured Compiler
 
 showCompilerId :: Compiler -> String
 showCompilerId = prettyShow . compilerId
@@ -174,6 +175,7 @@ data PackageDB = GlobalPackageDB
     deriving (Eq, Generic, Ord, Show, Read)
 
 instance Binary PackageDB
+instance Structured PackageDB
 
 -- | We typically get packages from several databases, and stack them
 -- together. This type lets us be explicit about that stacking. For example
@@ -226,6 +228,7 @@ data OptimisationLevel = NoOptimisation
     deriving (Bounded, Enum, Eq, Generic, Read, Show)
 
 instance Binary OptimisationLevel
+instance Structured OptimisationLevel
 
 flagToOptimisationLevel :: Maybe String -> OptimisationLevel
 flagToOptimisationLevel Nothing  = NormalOptimisation
@@ -253,6 +256,7 @@ data DebugInfoLevel = NoDebugInfo
     deriving (Bounded, Enum, Eq, Generic, Read, Show)
 
 instance Binary DebugInfoLevel
+instance Structured DebugInfoLevel
 
 flagToDebugInfoLevel :: Maybe String -> DebugInfoLevel
 flagToDebugInfoLevel Nothing  = NormalDebugInfo
@@ -408,6 +412,7 @@ data ProfDetailLevel = ProfDetailNone
     deriving (Eq, Generic, Read, Show)
 
 instance Binary ProfDetailLevel
+instance Structured ProfDetailLevel
 
 flagToProfDetailLevel :: String -> ProfDetailLevel
 flagToProfDetailLevel "" = ProfDetailDefault

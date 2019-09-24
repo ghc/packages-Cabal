@@ -86,6 +86,7 @@ instance Bounded Verbosity where
     maxBound = mkVerbosity maxBound
 
 instance Binary Verbosity
+instance Structured Verbosity
 
 -- We shouldn't print /anything/ unless an error occurs in silent mode
 silent :: Verbosity

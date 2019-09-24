@@ -11,6 +11,7 @@ data VerbosityLevel = Silent | Normal | Verbose | Deafening
     deriving (Generic, Show, Read, Eq, Ord, Enum, Bounded)
 
 instance Binary VerbosityLevel
+instance Structured VerbosityLevel
 
 data VerbosityFlag
     = VCallStack
@@ -21,3 +22,4 @@ data VerbosityFlag
     deriving (Generic, Show, Read, Eq, Ord, Enum, Bounded)
 
 instance Binary VerbosityFlag
+instance Structured VerbosityFlag

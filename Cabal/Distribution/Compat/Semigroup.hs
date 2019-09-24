@@ -21,6 +21,7 @@ module Distribution.Compat.Semigroup
     ) where
 
 import Distribution.Compat.Binary (Binary)
+import Distribution.Utils.StructuredBinary (Structured)
 
 import GHC.Generics
 -- Data.Semigroup is available since GHC 8.0/base-4.9 in `base`
@@ -38,7 +39,9 @@ instance Semigroup (First' a) where
 
 -- | A copy of 'Data.Semigroup.Last'.
 newtype Last' a = Last' { getLast' :: a }
-  deriving (Eq, Ord, Read, Show, Binary)
+  deriving (Eq, Ord, Read, Show, Generic, Binary)
+
+instance Structured a => Structured (Last' a)
 
 instance Semigroup (Last' a) where
   _ <> b = b
@@ -49,7 +52,9 @@ instance Functor Last' where
 -- | A wrapper around 'Maybe', providing the 'Semigroup' and 'Monoid' instances
 -- implemented for 'Maybe' since @base-4.11@.
 newtype Option' a = Option' { getOption' :: Maybe a }
-  deriving (Eq, Ord, Read, Show, Binary, Functor)
+  deriving (Eq, Ord, Read, Show, Binary, Generic, Functor)
+
+instance Structured a => Structured (Option' a)
 
 instance Semigroup a => Semigroup (Option' a) where
   Option' (Just a) <> Option' (Just b) = Option' (Just (a <> b))

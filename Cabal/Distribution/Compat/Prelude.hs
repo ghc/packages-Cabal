@@ -38,6 +38,7 @@ module Distribution.Compat.Prelude (
     Generic,
     NFData (..), genericRnf,
     Binary (..),
+    Structured,
     Alternative (..),
     MonadPlus (..),
     IsString (..),
@@ -157,6 +158,8 @@ import qualified Text.PrettyPrint as Disp
 
 import qualified Prelude as OrigPrelude
 import Distribution.Compat.Stack
+
+import Distribution.Utils.StructuredBinary (Structured)
 
 type IO a = WithCallStack (OrigPrelude.IO a)
 type NoCallStackIO a = OrigPrelude.IO a

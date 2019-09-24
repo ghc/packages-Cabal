@@ -285,6 +285,7 @@ data ConfigFlags = ConfigFlags {
   deriving (Generic, Read, Show)
 
 instance Binary ConfigFlags
+instance Structured ConfigFlags
 
 -- | More convenient version of 'configPrograms'. Results in an
 -- 'error' if internal invariant is violated.

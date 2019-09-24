@@ -133,6 +133,7 @@ data ConfiguredProgram = ConfiguredProgram {
   deriving (Eq, Generic, Read, Show, Typeable)
 
 instance Binary ConfiguredProgram
+instance Structured ConfiguredProgram
 
 -- | Where a program was found. Also tells us whether it's specified by user or
 -- not.  This includes not just the path, but the program as well.
@@ -145,6 +146,7 @@ data ProgramLocation
       deriving (Eq, Generic, Read, Show)
 
 instance Binary ProgramLocation
+instance Structured ProgramLocation
 
 -- | The full path of a configured program.
 programPath :: ConfiguredProgram -> FilePath

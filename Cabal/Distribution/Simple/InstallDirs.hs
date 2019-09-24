@@ -101,6 +101,7 @@ data InstallDirs dir = InstallDirs {
     } deriving (Eq, Read, Show, Functor, Generic)
 
 instance Binary dir => Binary (InstallDirs dir)
+instance Structured dir => Structured (InstallDirs dir)
 
 instance (Semigroup dir, Monoid dir) => Monoid (InstallDirs dir) where
   mempty = gmempty
@@ -355,6 +356,7 @@ newtype PathTemplate = PathTemplate [PathComponent]
   deriving (Eq, Ord, Generic)
 
 instance Binary PathTemplate
+instance Structured PathTemplate
 
 type PathTemplateEnv = [(PathTemplateVariable, PathTemplate)]
 

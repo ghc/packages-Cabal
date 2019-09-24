@@ -40,5 +40,5 @@ instance Parsec ExposedModule where
         return (ExposedModule m reexport)
 
 instance Binary ExposedModule
-
+instance Structured ExposedModule
 instance NFData ExposedModule where rnf = genericRnf

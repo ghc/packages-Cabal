@@ -36,10 +36,12 @@ import Distribution.Compat.Prelude
 import Distribution.Types.Version
 import Prelude ()
 
+import Data.Proxy                          (Proxy (..))
 import Distribution.CabalSpecVersion
 import Distribution.Parsec
 import Distribution.Pretty
-import Text.PrettyPrint              ((<+>))
+import Distribution.Utils.StructuredBinary (Structure (..), Structured (..))
+import Text.PrettyPrint                    ((<+>))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Distribution.Compat.DList       as DList
@@ -60,6 +62,11 @@ data VersionRange
   deriving ( Data, Eq, Generic, Read, Show, Typeable )
 
 instance Binary VersionRange
+
+-- VersionRange is recursive, thus manual instance
+instance Structured VersionRange where
+    structure _  = Nominal 0 "VersionRange"
+        [ structure (Proxy :: Proxy Version) ]
 
 instance NFData VersionRange where rnf = genericRnf
 

@@ -26,11 +26,12 @@ module Distribution.ModuleName (
 import Prelude ()
 import Distribution.Compat.Prelude
 
-import Distribution.Utils.ShortText
-import System.FilePath ( pathSeparator )
-
-import Distribution.Pretty
+import Data.Proxy (Proxy (..))
 import Distribution.Parsec
+import Distribution.Pretty
+import Distribution.Utils.ShortText
+import Distribution.Utils.StructuredBinary (Structured (..), Structure (..))
+import System.FilePath ( pathSeparator )
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -41,6 +42,7 @@ newtype ModuleName = ModuleName ShortTextLst
   deriving (Eq, Generic, Ord, Read, Show, Typeable, Data)
 
 instance Binary ModuleName
+instance Structured ModuleName
 
 instance NFData ModuleName where
     rnf (ModuleName ms) = rnf ms
@@ -130,6 +132,9 @@ instance Read ShortTextLst where
 instance Binary ShortTextLst where
     put = put . stlToList
     get = stlFromList <$> get
+
+instance Structured ShortTextLst where
+    structure _ = Nominal 0 "ShortTextLst" [structure (Proxy :: Proxy ShortText) ]
 
 stlToList :: ShortTextLst -> [ShortText]
 stlToList STLNil = []

@@ -115,7 +115,7 @@ data Flag = MkFlag
     deriving (Show, Eq, Typeable, Data, Generic)
 
 instance Binary Flag
-
+instance Structured Flag
 instance NFData Flag where rnf = genericRnf
 
 -- | A 'Flag' initialized with default parameters.
@@ -161,7 +161,7 @@ unFlagName :: FlagName -> String
 unFlagName (FlagName s) = fromShortText s
 
 instance Binary FlagName
-
+instance Structured FlagName
 instance Pretty FlagName where
     pretty = Disp.text . unFlagName
 
@@ -182,6 +182,8 @@ instance Parsec FlagName where
 newtype FlagAssignment
   = FlagAssignment { getFlagAssignment :: Map.Map FlagName (Int, Bool) }
   deriving (Binary, Generic, NFData)
+
+instance Structured FlagAssignment
 
 instance Eq FlagAssignment where
   (==) (FlagAssignment m1) (FlagAssignment m2)

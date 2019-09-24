@@ -18,6 +18,7 @@ import Prelude ()
 import Distribution.Pretty
 import Distribution.Parsec
 import Distribution.Utils.Generic (isAsciiAlphaNum)
+import Distribution.Utils.StructuredBinary (Structured (..), Structure (..))
 import Distribution.SPDX.LicenseListVersion
 
 import qualified Data.Binary.Get as Binary
@@ -412,6 +413,10 @@ instance Binary LicenseId where
         if i > fromIntegral (fromEnum (maxBound :: LicenseId))
         then fail "Too large LicenseId tag"
         else return (toEnum (fromIntegral i))
+
+-- note: remember to bump version each time the definition changes
+instance Structured LicenseId where
+    structure _ = Nominal 0 "LicenseId" []
 
 instance Pretty LicenseId where
     pretty = Disp.text . licenseId

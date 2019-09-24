@@ -13,6 +13,7 @@ data PathComponent =
      deriving (Eq, Ord, Generic)
 
 instance Binary PathComponent
+instance Structured PathComponent
 
 data PathTemplateVariable =
        PrefixVar     -- ^ The @$prefix@ path variable
@@ -42,6 +43,7 @@ data PathTemplateVariable =
   deriving (Eq, Ord, Generic)
 
 instance Binary PathTemplateVariable
+instance Structured PathTemplateVariable
 
 instance Show PathTemplateVariable where
   show PrefixVar     = "prefix"

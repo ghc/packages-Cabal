@@ -70,9 +70,11 @@ import Distribution.Simple.Utils
 import Distribution.Version
 import Distribution.Pretty
 import Distribution.Verbosity
+import Distribution.Utils.StructuredBinary (Structured (..), Structure (..))
 
 import Control.Monad (join)
 import Data.Tuple (swap)
+import Data.Proxy (Proxy (..))
 import qualified Data.Map as Map
 
 -- ------------------------------------------------------------
@@ -149,6 +151,12 @@ instance Binary ProgramDb where
       progSearchPath  = searchpath,
       configuredProgs = progs
     }
+
+instance Structured ProgramDb where
+    structure _ = Nominal 0 "ProgramDb"
+        [ structure (Proxy :: Proxy ProgramSearchPath)
+        , structure (Proxy :: Proxy ConfiguredProgs)
+        ]
 
 
 -- | The 'Read'\/'Show' and 'Binary' instances do not preserve all the

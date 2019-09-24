@@ -13,12 +13,14 @@ module Distribution.Types.PkgconfigVersionRange (
 import Distribution.Compat.Prelude
 import Prelude ()
 
+import Data.Proxy                          (Proxy (..))
 import Distribution.CabalSpecVersion
 import Distribution.Parsec
 import Distribution.Pretty
 import Distribution.Types.PkgconfigVersion
 import Distribution.Types.Version
 import Distribution.Types.VersionRange
+import Distribution.Utils.StructuredBinary (Structure (..), Structured (..))
 
 import qualified Data.ByteString.Char8           as BS8
 import qualified Distribution.Compat.CharParsing as P
@@ -37,6 +39,9 @@ data PkgconfigVersionRange
   deriving (Generic, Read, Show, Eq, Typeable, Data)
 
 instance Binary PkgconfigVersionRange
+instance Structured PkgconfigVersionRange where
+    structure _  = Nominal 0 "PkgconfigVersionRange"
+        [ structure (Proxy :: Proxy PkgconfigVersion) ]
 instance NFData PkgconfigVersionRange where rnf = genericRnf
 
 instance Pretty PkgconfigVersionRange where

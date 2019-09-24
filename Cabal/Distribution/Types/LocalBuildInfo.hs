@@ -159,6 +159,7 @@ data LocalBuildInfo = LocalBuildInfo {
   } deriving (Generic, Read, Show)
 
 instance Binary LocalBuildInfo
+instance Structured LocalBuildInfo
 
 -------------------------------------------------------------------------------
 -- Accessor functions

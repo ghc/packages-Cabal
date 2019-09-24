@@ -146,6 +146,7 @@ data PackageIndex a = PackageIndex {
   } deriving (Eq, Generic, Show, Read)
 
 instance Binary a => Binary (PackageIndex a)
+instance Structured a => Structured (PackageIndex a)
 
 -- | The default package index which contains 'InstalledPackageInfo'.  Normally
 -- use this.

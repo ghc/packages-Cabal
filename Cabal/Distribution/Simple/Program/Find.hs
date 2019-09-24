@@ -70,6 +70,7 @@ data ProgramSearchPathEntry =
   deriving (Eq, Generic)
 
 instance Binary ProgramSearchPathEntry
+instance Structured ProgramSearchPathEntry
 
 defaultProgramSearchPath :: ProgramSearchPath
 defaultProgramSearchPath = [ProgramSearchPathDefault]

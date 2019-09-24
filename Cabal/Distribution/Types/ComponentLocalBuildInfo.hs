@@ -111,6 +111,7 @@ data ComponentLocalBuildInfo
   deriving (Generic, Read, Show)
 
 instance Binary ComponentLocalBuildInfo
+instance Structured ComponentLocalBuildInfo
 
 instance IsNode ComponentLocalBuildInfo where
     type Key ComponentLocalBuildInfo = UnitId

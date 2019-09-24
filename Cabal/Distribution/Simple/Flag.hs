@@ -54,6 +54,7 @@ import Distribution.Compat.Stack
 data Flag a = Flag a | NoFlag deriving (Eq, Generic, Show, Read)
 
 instance Binary a => Binary (Flag a)
+instance Structured a => Structured (Flag a)
 
 instance Functor Flag where
   fmap f (Flag x) = Flag (f x)
