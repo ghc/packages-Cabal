@@ -484,6 +484,7 @@ library
     Distribution.Compat.CharParsing
     Distribution.FieldGrammar
     Distribution.FieldGrammar.Class
+    Distribution.FieldGrammar.Described
     Distribution.FieldGrammar.FieldDescrs
     Distribution.FieldGrammar.Parsec
     Distribution.FieldGrammar.Pretty

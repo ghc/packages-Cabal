@@ -20,6 +20,7 @@ import Distribution.Utils.ShortText
 import qualified Distribution.Compat.CharParsing as P
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 import Distribution.Types.ComponentId
 import Distribution.Types.PackageId
 
@@ -78,6 +79,9 @@ instance Pretty UnitId where
 --
 instance Parsec UnitId where
     parsec = mkUnitId <$> P.munch1 (\c -> isAlphaNum c || c `elem` "-_.+")
+
+instance Described UnitId where
+    describe _ = text "[:alnum:-_.+]+"
 
 -- | If you need backwards compatibility, consider using 'display'
 -- instead, which is supported by all versions of Cabal.

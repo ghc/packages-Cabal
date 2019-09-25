@@ -18,6 +18,7 @@ import Distribution.Utils.Generic (lowercase)
 
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -161,6 +162,9 @@ instance Pretty RepoType where
 
 instance Parsec RepoType where
   parsec = classifyRepoType <$> P.munch1 isIdent
+
+instance Described RepoType where
+  describe _ = Disp.text "(alphaNum|_|-)+"
 
 classifyRepoType :: String -> RepoType
 classifyRepoType s =

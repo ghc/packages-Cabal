@@ -31,6 +31,7 @@ import System.FilePath ( pathSeparator )
 
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -56,6 +57,9 @@ instance Parsec ModuleName where
             c  <- P.satisfy isUpper
             cs <- P.munch validModuleChar
             return (c:cs)
+
+instance Described ModuleName where
+    describe _ = Disp.text "{Haskell module name}"
 
 validModuleChar :: Char -> Bool
 validModuleChar c = isAlphaNum c || c == '_' || c == '\''

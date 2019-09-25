@@ -12,6 +12,7 @@ import Distribution.Compat.Prelude
 import Distribution.CabalSpecVersion (CabalSpecVersion (..))
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -52,3 +53,6 @@ instance Parsec BuildType where
               return Custom
           else fail ("unknown build-type: '" ++ name ++ "'")
       _           -> fail ("unknown build-type: '" ++ name ++ "'")
+      
+instance Described BuildType where
+  describe _ = Disp.text "One of ``Simple``, ``Configure``, ``Make`` or ``Custom``"

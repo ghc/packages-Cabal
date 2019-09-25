@@ -10,6 +10,7 @@ import Distribution.Compat.Prelude
 
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -26,6 +27,9 @@ instance Parsec ExecutableScope where
     parsec = P.try pub <|> pri where
         pub = ExecutablePublic  <$ P.string "public"
         pri = ExecutablePrivate <$ P.string "private"
+
+instance Described ExecutableScope where
+    describe _ = Disp.text "public|private"
 
 instance Binary ExecutableScope
 

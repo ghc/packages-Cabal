@@ -12,6 +12,7 @@ import Distribution.Utils.ShortText
 import qualified Text.PrettyPrint as Disp
 import Distribution.Pretty
 import Distribution.Parsec
+import Distribution.FieldGrammar.Described (Described (..))
 
 -- | A package name.
 --
@@ -55,3 +56,6 @@ instance Parsec PackageName where
 
 instance NFData PackageName where
     rnf (PackageName pkg) = rnf pkg
+
+instance Described PackageName where
+  describe _ = Disp.text "{unqualified-component-name}"

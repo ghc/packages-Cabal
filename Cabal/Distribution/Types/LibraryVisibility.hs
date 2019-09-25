@@ -10,6 +10,7 @@ import Prelude ()
 
 import Distribution.Parsec
 import Distribution.Pretty
+import Distribution.FieldGrammar.Described (Described (..))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint                as Disp
@@ -36,6 +37,9 @@ instance Parsec LibraryVisibility where
       "public"  -> return LibraryVisibilityPublic
       "private" -> return LibraryVisibilityPrivate
       _         -> fail $ "Unknown visibility: " ++ name
+
+instance Described LibraryVisibility where
+  describe _ = Disp.text "public|private"
 
 instance Binary LibraryVisibility
 instance NFData LibraryVisibility where rnf = genericRnf

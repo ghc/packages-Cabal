@@ -33,19 +33,23 @@ import Distribution.Compat.Newtype
 import Distribution.Compat.Prelude
 import Prelude ()
 
-import Data.Functor.Identity         (Identity (..))
-import Data.Proxy                    (Proxy (..))
+import Data.Functor.Identity               (Identity (..))
+import Data.Proxy                          (Proxy (..))
 import Distribution.CabalSpecVersion
-import Distribution.Compiler         (CompilerFlavor)
-import Distribution.License          (License)
+import Distribution.Compiler               (CompilerFlavor)
+import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.License                (License)
 import Distribution.Parsec
 import Distribution.Pretty
 import Distribution.Version
-       (LowerBound (..), Version, VersionRange, anyVersion, asVersionIntervals, mkVersion)
-import Text.PrettyPrint              (Doc, comma, fsep, punctuate, vcat, (<+>))
+       (LowerBound (..), Version, VersionRange, anyVersion, asVersionIntervals,
+       mkVersion)
+import Text.PrettyPrint
+       (Doc, comma, fsep, punctuate, vcat, (<+>))
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Distribution.SPDX               as SPDX
+import qualified Text.PrettyPrint                as PP
 
 -- | Vertical list with commas. Displayed with 'vcat'
 data CommaVCat = CommaVCat
@@ -130,6 +134,9 @@ instance Parsec Token where
 instance Pretty Token where
     pretty = showToken . unpack
 
+instance Described Token where
+    describe _ = PP.text "{haskell-string}|[^ ,]+"
+
 -- | Haskell string or @[^ ]+@
 newtype Token' = Token' { getToken' :: String }
 
@@ -141,6 +148,9 @@ instance Parsec Token' where
 instance Pretty Token' where
     pretty = showToken . unpack
 
+instance Described Token' where
+    describe _ = PP.text "{haskell-string}|[^ ]"
+
 -- | Either @"quoted"@ or @un-quoted@.
 newtype MQuoted a = MQuoted { getMQuoted :: a }
 
@@ -151,6 +161,10 @@ instance Parsec a => Parsec (MQuoted a) where
 
 instance Pretty a => Pretty (MQuoted a)  where
     pretty = pretty . unpack
+
+instance Described a => Described (MQuoted a) where
+    -- TODO: this is simplification
+    describe _ = describe ([] :: [a])
 
 -- | Version range or just version, i.e. @cabal-version@ field.
 --
@@ -178,6 +192,9 @@ instance Parsec SpecVersion where
 instance Pretty SpecVersion where
     pretty = either pretty pretty . unpack
 
+instance Described SpecVersion where
+    describe _ = PP.text "3.0" -- :)
+
 specVersionFromRange :: VersionRange -> Version
 specVersionFromRange versionRange = case asVersionIntervals versionRange of
     []                            -> mkVersion [0]
@@ -197,6 +214,9 @@ instance Parsec SpecLicense where
 
 instance Pretty SpecLicense where
     pretty = either pretty pretty . unpack
+
+instance Described SpecLicense where
+    describe _ = PP.text "{spdx-license-expression}"
 
 -- | Version range or just version
 newtype TestedWith = TestedWith { getTestedWith :: (CompilerFlavor, VersionRange) }
@@ -220,6 +240,9 @@ instance Parsec FilePathNT where
 
 instance Pretty FilePathNT where
     pretty = showFilePath . unpack
+
+instance Described FilePathNT where
+    describe _ = describe ([] :: [Token])
 
 -------------------------------------------------------------------------------
 -- Internal

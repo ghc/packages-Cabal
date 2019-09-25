@@ -1,0 +1,3 @@
+packages: Cabal/
+packages: buildinfo-reference-generator/
+tests: False
