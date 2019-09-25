@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Distribution.Types.ForeignLibType(
     ForeignLibType(..),
@@ -13,7 +14,7 @@ import Distribution.PackageDescription.Utils
 
 import Distribution.Pretty
 import Distribution.Parsec
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -43,7 +44,7 @@ instance Parsec ForeignLibType where
       _               -> ForeignLibTypeUnknown
 
 instance Described ForeignLibType where
-  describe _ = Disp.text "native-shared|native-static"
+  describe _ = REUnion ["native-shared","native-static"]
 
 instance Binary ForeignLibType
 

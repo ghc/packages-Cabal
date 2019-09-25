@@ -13,7 +13,7 @@ import Distribution.Utils.ShortText
 import qualified Distribution.Compat.CharParsing as P
 import Distribution.Pretty
 import Distribution.Parsec
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import Text.PrettyPrint (text)
 
@@ -62,4 +62,4 @@ instance Parsec AbiHash where
     parsec = fmap mkAbiHash (P.munch isAlphaNum)
 
 instance Described AbiHash where
-    describe _ = text "[:alnum:]*" -- is this an error?
+    describe _ = reMunchCS CSAlphaNum

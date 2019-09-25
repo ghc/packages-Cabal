@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 module Distribution.Types.BenchmarkType (
     BenchmarkType(..),
@@ -40,4 +41,4 @@ instance Parsec BenchmarkType where
        _                -> BenchmarkTypeUnknown name ver
 
 instance Described BenchmarkType where
-    describe _ = text "exitcode-stdio-1.0"
+    describe _ = "exitcode-stdio-1.0"

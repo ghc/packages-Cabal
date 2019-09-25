@@ -24,6 +24,118 @@ default-language
   * more documentation about :pkg-field:`default-language`
 
 
+Library stanza fields
+---------------------
+
+
+exposed
+  * format: ``True|False``
+  * more documentation about :pkg-field:`exposed`
+
+
+Test-suite stanza fields
+------------------------
+
+
+main-is
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`main-is`
+
+test-module
+  * format: ``{module-name}``
+  * more documentation about :pkg-field:`test-module`
+
+type
+  * format: ``exitcode-stdio-1.0|detailed-0.9``
+  * more documentation about :pkg-field:`type`
+
+
+Benchmark stanza fields
+-----------------------
+
+
+benchmark-module
+  * format: ``{module-name}``
+  * more documentation about :pkg-field:`benchmark-module`
+
+main-is
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`main-is`
+
+type
+  * format: ``exitcode-stdio-1.0``
+  * more documentation about :pkg-field:`type`
+
+
+Foreign-library stanza fields
+-----------------------------
+
+
+lib-version-info
+  * format: ``[:digit:]+(:[:digit:]+(:[:digit:]+)?)?``
+  * more documentation about :pkg-field:`lib-version-info`
+
+lib-version-linux
+  * format: ``[:digit:]+(.[:digit:]+)*``
+  * more documentation about :pkg-field:`lib-version-linux`
+
+type
+  * format: ``native-shared|native-static``
+  * default: ``unknown``
+  * more documentation about :pkg-field:`type`
+
+
+Flag stanza fields
+------------------
+
+
+default
+  * format: ``True|False``
+  * more documentation about :pkg-field:`default`
+
+description
+  * format: free text field
+  * more documentation about :pkg-field:`description`
+
+manual
+  * format: ``True|False``
+  * more documentation about :pkg-field:`manual`
+
+
+Source-Repository stanza fields
+-------------------------------
+
+
+branch
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`branch`
+
+location
+  * format: free text field
+  * more documentation about :pkg-field:`location`
+
+module
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`module`
+
+subdir
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`subdir`
+
+tag
+  * format: ``{haskell-string}|[^ ,]+``
+  * more documentation about :pkg-field:`tag`
+
+type
+  * format: ``[[:alnum:]-_]+``
+  * more documentation about :pkg-field:`type`
+
+
+Custom-setup stanza fields
+--------------------------
+
+
+
 Installed package info
 ----------------------
 
@@ -63,7 +175,7 @@ homepage
   * more documentation about :pkg-field:`homepage`
 
 id
-  * format: ``[:alnum:-_.+]+``
+  * format: ``[[:alnum:]+-._]+``
   * default: ````
   * more documentation about :pkg-field:`id`
 
@@ -124,7 +236,7 @@ trusted
   * more documentation about :pkg-field:`trusted`
 
 version
-  * format: ``\d+(.\d+)*``
+  * format: ``[:digit:]+(.[:digit:]+)*``
   * default: ````
   * more documentation about :pkg-field:`version`
 

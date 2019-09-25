@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,7 +31,7 @@ import Data.Array (Array, accumArray, bounds, Ix(inRange), (!))
 
 import Distribution.Parsec
 import Distribution.Pretty
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -73,7 +74,7 @@ instance Parsec Language where
   parsec = classifyLanguage <$> P.munch1 isAlphaNum
 
 instance Described Language where
-    describe _ = Disp.text "Haskell98|Haskell2010"
+    describe _ = REUnion ["Haskell98", "Haskell2010"]
 
 classifyLanguage :: String -> Language
 classifyLanguage = \str -> case lookup str langTable of

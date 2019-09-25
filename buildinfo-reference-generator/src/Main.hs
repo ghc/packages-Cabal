@@ -8,10 +8,14 @@ import Distribution.Compat.Newtype                  (pack')
 import Distribution.FieldGrammar.Class
 import Distribution.FieldGrammar.Described
 import Distribution.Fields.Field                    (FieldName)
-import Distribution.PackageDescription.FieldGrammar (buildInfoFieldGrammar)
+import Distribution.PackageDescription.FieldGrammar
 import Distribution.Pretty                          (pretty)
 import Distribution.Simple.Utils                    (fromUTF8BS)
 import Distribution.Types.BuildInfo                 (BuildInfo)
+import Distribution.Types.GenericPackageDescription (mkFlagName)
+import Distribution.Types.LibraryName               (LibraryName (..))
+import Distribution.Types.SourceRepo                (RepoKind (..))
+import Distribution.Types.UnqualComponentName       (mkUnqualComponentName)
 
 import qualified Data.Map.Strict  as Map
 import qualified Text.PrettyPrint as PP
@@ -19,27 +23,47 @@ import qualified Text.PrettyPrint as PP
 -- temporary
 import Distribution.Types.InstalledPackageInfo.FieldGrammar (ipiFieldGrammar)
 
-buildinfoReference :: Reference BuildInfo BuildInfo
-buildinfoReference = buildInfoFieldGrammar
-
 main :: IO ()
 main = do
     putStrLn header
 
-    outputReference buildinfoReference
+    outputReference buildInfoFieldGrammar
+
+    subsection "Library stanza fields"
+    outputReference $ libraryFieldGrammar LMainLibName // buildInfoFieldGrammar
+
+    subsection "Test-suite stanza fields"
+    outputReference $ testSuiteFieldGrammar // buildInfoFieldGrammar
+
+    subsection "Benchmark stanza fields"
+    outputReference $ benchmarkFieldGrammar // buildInfoFieldGrammar
+
+    subsection "Foreign-library stanza fields"
+    outputReference $ foreignLibFieldGrammar (mkUnqualComponentName "-") // buildInfoFieldGrammar
+
+    subsection "Flag stanza fields"
+    outputReference $ flagFieldGrammar (mkFlagName "flag-name")
+
+    subsection "Source-Repository stanza fields"
+    outputReference $ sourceRepoFieldGrammar RepoHead
+
+    subsection "Custom-setup stanza fields"
+    outputReference $ setupBInfoFieldGrammar True
 
     -- temporary
-    putStrLn $ unlines
-        [ ""
-        , "Installed package info"
-        , "----------------------"
-        , ""
-        ]
+    subsection "Installed package info"
 
     outputReference ipiFieldGrammar
 
     return ()
   where
+    subsection n = putStrLn $ unlines
+        [ ""
+        , n
+        , '-' <$ n
+        , ""
+        ]
+
     tellname fn = putStrLn $ fromUTF8BS fn
 
     moredesc fn = do
@@ -81,6 +105,9 @@ main = do
 newtype Reference a b = Reference (Map FieldName FieldDesc)
   deriving (Functor)
 
+(//) :: Reference a b -> Reference c d -> Reference a b
+Reference ab // Reference cd = Reference $ Map.difference ab cd
+
 data FieldDesc
     = BooleanFieldDesc Bool
     | UniqueField  PP.Doc  -- ^ not used in BuildInfo
@@ -97,17 +124,17 @@ instance FieldGrammar Reference where
     blurFieldGrammar _ (Reference xs) = Reference xs
 
     uniqueFieldAla fn pack _l =
-        Reference $ Map.singleton fn $ UniqueField (describe pack)
+        Reference $ Map.singleton fn $ UniqueField (describeDoc pack)
 
     booleanFieldDef fn _l def =
         Reference $ Map.singleton fn $ BooleanFieldDesc def
 
     optionalFieldAla fn pack _l =
-        Reference $ Map.singleton fn $ OptionalFieldAla (describe pack)
+        Reference $ Map.singleton fn $ OptionalFieldAla (describeDoc pack)
 
     optionalFieldDefAla fn pack _l def =
         Reference $ Map.singleton fn $ OptionalFieldDefAla
-            (describe pack)
+            (describeDoc pack)
             (pretty $ pack' pack def)
 
     freeTextField fn _l =

@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleContexts       #-}
 {-# LANGUAGE FlexibleInstances      #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings      #-}
 {-# LANGUAGE RankNTypes             #-}
 {-# LANGUAGE ScopedTypeVariables    #-}
-{-# LANGUAGE TypeSynonymInstances   #-}
 -- | This module provides @newtype@ wrappers to be used with "Distribution.FieldGrammar".
 module Distribution.Parsec.Newtypes (
     -- * List
@@ -37,7 +37,7 @@ import Data.Functor.Identity               (Identity (..))
 import Data.Proxy                          (Proxy (..))
 import Distribution.CabalSpecVersion
 import Distribution.Compiler               (CompilerFlavor)
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 import Distribution.License                (License)
 import Distribution.Parsec
 import Distribution.Pretty
@@ -49,7 +49,6 @@ import Text.PrettyPrint
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Distribution.SPDX               as SPDX
-import qualified Text.PrettyPrint                as PP
 
 -- | Vertical list with commas. Displayed with 'vcat'
 data CommaVCat = CommaVCat
@@ -135,7 +134,7 @@ instance Pretty Token where
     pretty = showToken . unpack
 
 instance Described Token where
-    describe _ = PP.text "{haskell-string}|[^ ,]+"
+    describe _ = REUnion [RENamed "haskell-string", reMunch1CS CSNotSpaceOrComma]
 
 -- | Haskell string or @[^ ]+@
 newtype Token' = Token' { getToken' :: String }
@@ -149,7 +148,7 @@ instance Pretty Token' where
     pretty = showToken . unpack
 
 instance Described Token' where
-    describe _ = PP.text "{haskell-string}|[^ ]"
+    describe _ = REUnion [RENamed "haskell-string", reMunch1CS CSNotSpace]
 
 -- | Either @"quoted"@ or @un-quoted@.
 newtype MQuoted a = MQuoted { getMQuoted :: a }
@@ -193,7 +192,7 @@ instance Pretty SpecVersion where
     pretty = either pretty pretty . unpack
 
 instance Described SpecVersion where
-    describe _ = PP.text "3.0" -- :)
+    describe _ = "3.0" -- :)
 
 specVersionFromRange :: VersionRange -> Version
 specVersionFromRange versionRange = case asVersionIntervals versionRange of
@@ -216,7 +215,7 @@ instance Pretty SpecLicense where
     pretty = either pretty pretty . unpack
 
 instance Described SpecLicense where
-    describe _ = PP.text "{spdx-license-expression}"
+    describe _ = RENamed "spdx-license-expression"
 
 -- | Version range or just version
 newtype TestedWith = TestedWith { getTestedWith :: (CompilerFlavor, VersionRange) }

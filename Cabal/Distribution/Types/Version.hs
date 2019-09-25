@@ -21,7 +21,7 @@ import Prelude ()
 
 import Distribution.Parsec
 import Distribution.Pretty
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Data.Version                    as Base
 import qualified Distribution.Compat.CharParsing as P
@@ -102,7 +102,7 @@ instance Parsec Version where
                 (_ : _) -> parsecWarning PWTVersionTag "version with tags"
 
 instance Described Version where
-    describe _ = Disp.text "\\d+(.\\d+)*"
+    describe _ = reDigits <> REMunch (reDot <> reDigits)
 
 -- | An integral without leading zeroes.
 --

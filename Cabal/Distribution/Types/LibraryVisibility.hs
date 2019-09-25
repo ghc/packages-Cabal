@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 module Distribution.Types.LibraryVisibility(
     LibraryVisibility(..),
@@ -10,7 +11,7 @@ import Prelude ()
 
 import Distribution.Parsec
 import Distribution.Pretty
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint                as Disp
@@ -39,7 +40,7 @@ instance Parsec LibraryVisibility where
       _         -> fail $ "Unknown visibility: " ++ name
 
 instance Described LibraryVisibility where
-  describe _ = Disp.text "public|private"
+  describe _ = REUnion ["public","private"]
 
 instance Binary LibraryVisibility
 instance NFData LibraryVisibility where rnf = genericRnf

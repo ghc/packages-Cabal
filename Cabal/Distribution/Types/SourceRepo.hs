@@ -18,7 +18,7 @@ import Distribution.Utils.Generic (lowercase)
 
 import Distribution.Pretty
 import Distribution.Parsec
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -164,7 +164,7 @@ instance Parsec RepoType where
   parsec = classifyRepoType <$> P.munch1 isIdent
 
 instance Described RepoType where
-  describe _ = Disp.text "(alphaNum|_|-)+"
+  describe _ = reMunch1CS $ CSAlphaNum <> CSChar '_' <> CSChar '-'
 
 classifyRepoType :: String -> RepoType
 classifyRepoType s =

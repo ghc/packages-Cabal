@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Distribution.Types.BuildType (
     BuildType(..),
@@ -12,7 +13,7 @@ import Distribution.Compat.Prelude
 import Distribution.CabalSpecVersion (CabalSpecVersion (..))
 import Distribution.Pretty
 import Distribution.Parsec
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -55,4 +56,4 @@ instance Parsec BuildType where
       _           -> fail ("unknown build-type: '" ++ name ++ "'")
       
 instance Described BuildType where
-  describe _ = Disp.text "One of ``Simple``, ``Configure``, ``Make`` or ``Custom``"
+    describe _ = REUnion ["Simple","Configure","Custom","Make","Default"]

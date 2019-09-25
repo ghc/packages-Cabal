@@ -14,7 +14,7 @@ import Distribution.CabalSpecVersion
 import Distribution.Compat.Lens               (Lens', (&), (.~))
 import Distribution.Compat.Newtype
 import Distribution.FieldGrammar
-import Distribution.FieldGrammar.Described    (Described (..))
+import Distribution.FieldGrammar.Described
 import Distribution.FieldGrammar.FieldDescrs
 import Distribution.License
 import Distribution.ModuleName
@@ -194,7 +194,7 @@ instance Parsec CompatPackageKey where
         uid_char c = Char.isAlphaNum c || c `elem` ("-_.=[],:<>+" :: String)
 
 instance Described CompatPackageKey where
-    describe _ = Disp.text "{compat-package-key}"
+    describe _ = RENamed "compat-package-key"
 
 newtype InstWith = InstWith { getInstWith :: [(ModuleName,OpenModule)] }
 
@@ -207,7 +207,7 @@ instance Parsec InstWith where
     parsec = InstWith . Map.toList <$> parsecOpenModuleSubst
 
 instance Described InstWith where
-    describe _ = Disp.text "{open-module-substitution}"
+    describe _ = RENamed "open-module-substitution"
 
 -- | SPDX License expression or legacy license. Lenient parser, accepts either.
 newtype SpecLicenseLenient = SpecLicenseLenient { getSpecLicenseLenient :: Either SPDX.License License }
@@ -221,7 +221,7 @@ instance Pretty SpecLicenseLenient where
     pretty = either pretty pretty . getSpecLicenseLenient
 
 instance Described SpecLicenseLenient where
-    describe _ = Disp.text "{ipi-lenient-license}"
+    describe _ = RENamed "ipi-lenient-license"
 
 -------------------------------------------------------------------------------
 -- Basic fields

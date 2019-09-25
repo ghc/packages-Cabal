@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Distribution.Types.ExecutableScope (
     ExecutableScope(..),
@@ -10,7 +11,7 @@ import Distribution.Compat.Prelude
 
 import Distribution.Pretty
 import Distribution.Parsec
-import Distribution.FieldGrammar.Described (Described (..))
+import Distribution.FieldGrammar.Described
 
 import qualified Distribution.Compat.CharParsing as P
 import qualified Text.PrettyPrint as Disp
@@ -29,7 +30,7 @@ instance Parsec ExecutableScope where
         pri = ExecutablePrivate <$ P.string "private"
 
 instance Described ExecutableScope where
-    describe _ = Disp.text "public|private"
+    describe _ = REUnion ["public","private"]
 
 instance Binary ExecutableScope
 
