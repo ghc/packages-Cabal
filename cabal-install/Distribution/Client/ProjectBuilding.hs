@@ -100,6 +100,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Set (Set)
 import qualified Data.Set as Set
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 import           Data.List (isPrefixOf)
 
@@ -111,13 +112,7 @@ import           Data.Maybe
 import           System.FilePath
 import           System.IO
 import           System.Directory
-
-#if !MIN_VERSION_directory(1,2,5)
-listDirectory :: FilePath -> IO [FilePath]
-listDirectory path =
-  (filter f) <$> (getDirectoryContents path)
-  where f filename = filename /= "." && filename /= ".."
-#endif
+import           Distribution.Compat.Directory (listDirectory)
 
 ------------------------------------------------------------------------------
 -- * Overall building strategy.
@@ -1442,11 +1437,10 @@ withTempInstalledPackageInfoFile verbosity tempdir action =
       ++ show perror
 
     readPkgConf pkgConfDir pkgConfFile = do
-      (warns, ipkg) <-
-        withUTF8FileContents (pkgConfDir </> pkgConfFile) $ \pkgConfStr ->
-        case Installed.parseInstalledPackageInfo pkgConfStr of
-          Left perrors -> pkgConfParseFailed $ unlines $ NE.toList perrors
-          Right (warns, ipkg) -> return (warns, ipkg)
+      pkgConfStr <- BS.readFile (pkgConfDir </> pkgConfFile)
+      (warns, ipkg) <- case Installed.parseInstalledPackageInfo pkgConfStr of
+        Left perrors -> pkgConfParseFailed $ unlines $ NE.toList perrors
+        Right (warns, ipkg) -> return (warns, ipkg)
 
       unless (null warns) $
         warn verbosity $ unlines warns

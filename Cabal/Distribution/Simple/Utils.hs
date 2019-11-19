@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
@@ -60,7 +61,8 @@ module Distribution.Simple.Utils (
         -- "Distribution.Utils.IOData" for convience as they're
         -- exposed in the API of 'rawSystemStdInOut'
         IOData(..),
-        IODataMode(..),
+        KnownIODataMode (..),
+        IODataMode (..),
 
         -- * copying files
         createDirectoryIfMissingVerbose,
@@ -171,7 +173,7 @@ import Distribution.Compat.Prelude
 import Control.Exception (SomeException)
 
 import Distribution.Utils.Generic
-import Distribution.Utils.IOData (IOData(..), IODataMode(..))
+import Distribution.Utils.IOData (IOData(..), IODataMode (..), KnownIODataMode (..))
 import qualified Distribution.Utils.IOData as IOData
 import Distribution.ModuleName as ModuleName
 import Distribution.System
@@ -226,6 +228,7 @@ import System.IO.Unsafe
     ( unsafeInterleaveIO )
 import qualified Control.Exception as Exception
 
+import Foreign.C.Error (Errno (..), ePIPE)
 import Data.Time.Clock.POSIX (getPOSIXTime, POSIXTime)
 import Control.Exception (IOException, evaluate, throwIO, fromException)
 import Numeric (showFFloat)
@@ -234,6 +237,8 @@ import qualified System.Process as Process
 import System.Process
          ( ProcessHandle, createProcess, rawSystem, runInteractiveProcess
          , showCommandForUser, waitForProcess)
+
+import qualified GHC.IO.Exception as GHC
 
 import qualified Text.PrettyPrint as Disp
 
@@ -792,11 +797,10 @@ createProcessWithEnv verbosity path args mcwd menv inp out err = withFrozenCallS
 --
 -- The output is assumed to be text in the locale encoding.
 --
-rawSystemStdout :: Verbosity -> FilePath -> [String] -> IO String
+rawSystemStdout :: forall mode. KnownIODataMode mode => Verbosity -> FilePath -> [String] -> IO mode 
 rawSystemStdout verbosity path args = withFrozenCallStack $ do
-  (IODataText output, errors, exitCode) <- rawSystemStdInOut verbosity path args
-                                                  Nothing Nothing
-                                                  Nothing IODataModeText
+  (output, errors, exitCode) <- rawSystemStdInOut verbosity path args
+    Nothing Nothing Nothing (IOData.iodataMode :: IODataMode mode)
   when (exitCode /= ExitSuccess) $
     die' verbosity errors
   return output
@@ -805,15 +809,16 @@ rawSystemStdout verbosity path args = withFrozenCallStack $ do
 -- also supply some input. Also provides control over whether the binary/text
 -- mode of the input and output.
 --
-rawSystemStdInOut :: Verbosity
+rawSystemStdInOut :: KnownIODataMode mode
+                  => Verbosity
                   -> FilePath                 -- ^ Program location
                   -> [String]                 -- ^ Arguments
                   -> Maybe FilePath           -- ^ New working dir or inherit
                   -> Maybe [(String, String)] -- ^ New environment or inherit
                   -> Maybe IOData             -- ^ input text and binary mode
-                  -> IODataMode               -- ^ output in binary mode
-                  -> IO (IOData, String, ExitCode) -- ^ output, errors, exit
-rawSystemStdInOut verbosity path args mcwd menv input outputMode = withFrozenCallStack $ do
+                  -> IODataMode mode          -- ^ iodata mode, acts as proxy
+                  -> IO (mode, String, ExitCode) -- ^ output, errors, exit
+rawSystemStdInOut verbosity path args mcwd menv input _ = withFrozenCallStack $ do
   printRawCommandAndArgs verbosity path args
 
   Exception.bracket
@@ -833,16 +838,11 @@ rawSystemStdInOut verbosity path args mcwd menv input outputMode = withFrozenCal
             evaluate (rnf str)
             return str
 
-      withAsync (hGetContents errh >>= force) $ \errA -> withAsync (IOData.hGetContents outh outputMode >>= force) $ \outA -> do
+      withAsync (hGetContents errh >>= force) $ \errA -> withAsync (hGetIODataContents outh >>= force) $ \outA -> do
         -- push all the input, if any
-        case input of
+        ignoreSigPipe $ case input of
           Nothing        -> return ()
-          Just inputData -> do
-            -- input mode depends on what the caller wants
-            -- todo: ignoreSigPipe
-            IOData.hPutContents inh inputData
-            --TODO: this probably fails if the process refuses to consume
-            -- or if it closes stdin (eg if it exits)
+          Just inputData -> IOData.hPutContents inh inputData
 
         -- wait for both to finish
         mberr1 <- waitCatch outA
@@ -859,8 +859,8 @@ rawSystemStdInOut verbosity path args mcwd menv input outputMode = withFrozenCal
                             " with error message:\n" ++ err
                          ++ case input of
                               Nothing       -> ""
-                              Just d | IOData.null d -> ""
-                              Just (IODataText inp) -> "\nstdin input:\n" ++ inp
+                              Just d | IOData.null d  -> ""
+                              Just (IODataText inp)   -> "\nstdin input:\n" ++ inp
                               Just (IODataBinary inp) -> "\nstdin input (binary):\n" ++ show inp
 
         -- Check if we we hit an exception while consuming the output
@@ -874,6 +874,12 @@ rawSystemStdInOut verbosity path args mcwd menv input outputMode = withFrozenCal
     reportOutputIOError (Left exc) = case fromException exc of
         Just ioe -> throwIO (ioeSetFileName ioe ("output of " ++ path))
         Nothing  -> throwIO exc
+
+    ignoreSigPipe :: IO () -> IO ()
+    ignoreSigPipe = Exception.handle $ \e -> case e of
+        GHC.IOError { GHC.ioe_type  = GHC.ResourceVanished, GHC.ioe_errno = Just ioe }
+            | Errno ioe == ePIPE -> return ()
+        _ -> throwIO e
 
 -- | Look for a program and try to find it's version number. It can accept
 -- either an absolute path or the name of a program binary, in which case we
