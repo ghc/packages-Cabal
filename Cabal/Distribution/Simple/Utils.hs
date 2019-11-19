@@ -168,6 +168,7 @@ module Distribution.Simple.Utils (
 
 import Prelude ()
 import Distribution.Compat.Prelude
+import Control.Exception (SomeException)
 
 import Distribution.Utils.Generic
 import Distribution.Utils.IOData (IOData(..), IODataMode(..))
@@ -175,6 +176,7 @@ import qualified Distribution.Utils.IOData as IOData
 import Distribution.ModuleName as ModuleName
 import Distribution.System
 import Distribution.Version
+import Distribution.Compat.Async
 import Distribution.Compat.CopyFile
 import Distribution.Compat.Internal.TempFile
 import Distribution.Compat.Exception
@@ -200,8 +202,6 @@ import qualified Paths_Cabal (version)
 import Distribution.Pretty
 import Distribution.Parsec
 
-import Control.Concurrent.MVar
-    ( newEmptyMVar, putMVar, takeMVar )
 import Data.Typeable
     ( cast )
 import qualified Data.ByteString.Lazy as BS
@@ -227,8 +227,7 @@ import System.IO.Unsafe
 import qualified Control.Exception as Exception
 
 import Data.Time.Clock.POSIX (getPOSIXTime, POSIXTime)
-import Control.Exception (IOException, evaluate, throwIO)
-import Control.Concurrent (forkIO)
+import Control.Exception (IOException, evaluate, throwIO, fromException)
 import Numeric (showFFloat)
 import qualified System.Process as Process
          ( CreateProcess(..), StdStream(..), proc)
@@ -829,53 +828,52 @@ rawSystemStdInOut verbosity path args mcwd menv input outputMode = withFrozenCal
       -- fork off a couple threads to pull on the stderr and stdout
       -- so if the process writes to stderr we do not block.
 
-      err <- hGetContents errh
+      let force :: NFData a => a -> IO a
+          force str = do
+            evaluate (rnf str)
+            return str
 
-      out <- IOData.hGetContents outh outputMode
+      withAsync (hGetContents errh >>= force) $ \errA -> withAsync (IOData.hGetContents outh outputMode >>= force) $ \outA -> do
+        -- push all the input, if any
+        case input of
+          Nothing        -> return ()
+          Just inputData -> do
+            -- input mode depends on what the caller wants
+            -- todo: ignoreSigPipe
+            IOData.hPutContents inh inputData
+            --TODO: this probably fails if the process refuses to consume
+            -- or if it closes stdin (eg if it exits)
 
-      mv <- newEmptyMVar
-      let force str = do
-            mberr <- Exception.try (evaluate (rnf str) >> return ())
-            putMVar mv (mberr :: Either IOError ())
-      _ <- forkIO $ force out
-      _ <- forkIO $ force err
+        -- wait for both to finish
+        mberr1 <- waitCatch outA
+        mberr2 <- waitCatch errA
 
-      -- push all the input, if any
-      case input of
-        Nothing -> return ()
-        Just inputData -> do
-          -- input mode depends on what the caller wants
-          IOData.hPutContents inh inputData
-          --TODO: this probably fails if the process refuses to consume
-          -- or if it closes stdin (eg if it exits)
+        err <- reportOutputIOError mberr2
 
-      -- wait for both to finish, in either order
-      mberr1 <- takeMVar mv
-      mberr2 <- takeMVar mv
+        -- wait for the program to terminate
+        exitcode <- waitForProcess pid
 
-      -- wait for the program to terminate
-      exitcode <- waitForProcess pid
-      unless (exitcode == ExitSuccess) $
-        debug verbosity $ path ++ " returned " ++ show exitcode
-                       ++ if null err then "" else
-                          " with error message:\n" ++ err
-                       ++ case input of
-                            Nothing       -> ""
-                            Just d | IOData.null d -> ""
-                            Just (IODataText inp) -> "\nstdin input:\n" ++ inp
-                            Just (IODataBinary inp) -> "\nstdin input (binary):\n" ++ show inp
+        unless (exitcode == ExitSuccess) $
+          debug verbosity $ path ++ " returned " ++ show exitcode
+                         ++ if null err then "" else
+                            " with error message:\n" ++ err
+                         ++ case input of
+                              Nothing       -> ""
+                              Just d | IOData.null d -> ""
+                              Just (IODataText inp) -> "\nstdin input:\n" ++ inp
+                              Just (IODataBinary inp) -> "\nstdin input (binary):\n" ++ show inp
 
-      -- Check if we we hit an exception while consuming the output
-      -- (e.g. a text decoding error)
-      reportOutputIOError mberr1
-      reportOutputIOError mberr2
+        -- Check if we we hit an exception while consuming the output
+        -- (e.g. a text decoding error)
+        out <- reportOutputIOError mberr1
 
-      return (out, err, exitcode)
+        return (out, err, exitcode)
   where
-    reportOutputIOError :: Either IOError () -> NoCallStackIO ()
-    reportOutputIOError =
-      either (\e -> throwIO (ioeSetFileName e ("output of " ++ path)))
-             return
+    reportOutputIOError :: Either SomeException a -> NoCallStackIO a
+    reportOutputIOError (Right x) = return x
+    reportOutputIOError (Left exc) = case fromException exc of
+        Just ioe -> throwIO (ioeSetFileName ioe ("output of " ++ path))
+        Nothing  -> throwIO exc
 
 -- | Look for a program and try to find it's version number. It can accept
 -- either an absolute path or the name of a program binary, in which case we
