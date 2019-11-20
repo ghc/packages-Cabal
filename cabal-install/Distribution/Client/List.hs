@@ -42,6 +42,7 @@ import Distribution.Version
 import Distribution.Verbosity (Verbosity)
 import Distribution.Deprecated.Text
          ( Text(disp), display )
+import Distribution.Utils.ShortText (fromShortText)
 
 import qualified Distribution.SPDX as SPDX
 
@@ -441,11 +442,11 @@ mergePackageInfo versionPref installedPkgs sourcePkgs selectedPkg showVer =
     license      = combine Source.licenseRaw    source
                            Installed.license    installed,
     maintainer   = combine Source.maintainer    source
-                           Installed.maintainer installed,
+                           (fromShortText . Installed.maintainer) installed,
     author       = combine Source.author        source
-                           Installed.author     installed,
+                           (fromShortText . Installed.author)     installed,
     homepage     = combine Source.homepage      source
-                           Installed.homepage   installed,
+                           (fromShortText . Installed.homepage)   installed,
     bugReports   = maybe "" Source.bugReports source,
     sourceRepo   = fromMaybe "" . join
                  . fmap (uncons Nothing Source.repoLocation
@@ -455,9 +456,9 @@ mergePackageInfo versionPref installedPkgs sourcePkgs selectedPkg showVer =
                     --TODO: installed package info is missing synopsis
     synopsis     = maybe "" Source.synopsis      source,
     description  = combine Source.description    source
-                           Installed.description installed,
+                           (fromShortText . Installed.description) installed,
     category     = combine Source.category       source
-                           Installed.category    installed,
+                           (fromShortText . Installed.category)    installed,
     flags        = maybe [] Source.genPackageFlags sourceGeneric,
     hasLib       = isJust installed
                 || maybe False (isJust . Source.condLibrary) sourceGeneric,

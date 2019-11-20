@@ -83,6 +83,7 @@ import Distribution.Pretty
 import Distribution.Verbosity as Verbosity
 import Distribution.Version
 import Distribution.Compat.Graph (IsNode(nodeKey))
+import Distribution.Utils.ShortText (toShortText)
 
 import System.FilePath ((</>), (<.>), isAbsolute)
 import System.Directory
@@ -406,15 +407,15 @@ generalInstalledPackageInfo adjustRelIncDirs pkg abi_hash lib lbi clbi installDi
         if ghc84
         then Left $ either id licenseToSPDX $ licenseRaw pkg
         else Right $ either licenseFromSPDX id $ licenseRaw pkg,
-    IPI.copyright          = copyright   pkg,
-    IPI.maintainer         = maintainer  pkg,
-    IPI.author             = author      pkg,
-    IPI.stability          = stability   pkg,
-    IPI.homepage           = homepage    pkg,
-    IPI.pkgUrl             = pkgUrl      pkg,
-    IPI.synopsis           = synopsis    pkg,
-    IPI.description        = description pkg,
-    IPI.category           = category    pkg,
+    IPI.copyright          = toShortText $ copyright   pkg,
+    IPI.maintainer         = toShortText $ maintainer  pkg,
+    IPI.author             = toShortText $ author      pkg,
+    IPI.stability          = toShortText $ stability   pkg,
+    IPI.homepage           = toShortText $ homepage    pkg,
+    IPI.pkgUrl             = toShortText $ pkgUrl      pkg,
+    IPI.synopsis           = toShortText $ synopsis    pkg,
+    IPI.description        = toShortText $ description pkg,
+    IPI.category           = toShortText $ category    pkg,
     IPI.abiHash            = abi_hash,
     IPI.indefinite         = componentIsIndefinite clbi,
     IPI.exposed            = libExposed  lib,

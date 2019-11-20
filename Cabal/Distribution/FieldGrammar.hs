@@ -9,6 +9,7 @@ module Distribution.FieldGrammar  (
     optionalField,
     optionalFieldDef,
     monoidalField,
+    freeTextFieldDefST,
     -- * Concrete grammar implementations
     ParsecFieldGrammar,
     ParsecFieldGrammar',
