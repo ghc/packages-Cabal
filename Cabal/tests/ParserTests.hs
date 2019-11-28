@@ -181,6 +181,7 @@ regressionTests = testGroup "regressions"
     , regressionTest "indentation.cabal"
     , regressionTest "indentation2.cabal"
     , regressionTest "indentation3.cabal"
+    , regressionTest "issue6083-pkg-pkg.cabal"
     ]
 
 regressionTest :: FilePath -> TestTree
