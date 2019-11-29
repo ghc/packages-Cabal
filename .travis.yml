@@ -53,6 +53,9 @@ matrix:
    - env: GHCVER=8.6.5 SCRIPT=script USE_GOLD=YES
      os: linux
      sudo: required
+   - env: GHCVER=8.8.1 SCRIPT=script USE_GOLD=YES
+     os: linux
+     sudo: required
    #- env: GHCVER=8.8.1 SCRIPT=script USE_GOLD=YES
    #  os: linux
    #  sudo: required
