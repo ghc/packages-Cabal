@@ -27,3 +27,5 @@ package cabal-testsuite
   ghc-options: -fno-ignore-asserts
 package cabal-install
   ghc-options: -fno-ignore-asserts
+
+packages: https://hackage.haskell.org/package/hackage-repo-tool-0.1.1.2/candidate/hackage-repo-tool-0.1.1.2.tar.gz
