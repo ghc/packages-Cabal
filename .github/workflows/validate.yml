@@ -1,0 +1,14 @@
+name: validate.sh
+# This workflow is triggered on pushes to the repository.
+on: [push]
+
+jobs:
+  build:
+    name: Validate
+    runs-on: ubuntu-18.04
+    container:
+      image: phadej/ghc:8.8.1-bionic
+    steps:
+      - name: Validate in docker
+        run: |
+          sh validate.sh
