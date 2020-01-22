@@ -21,7 +21,7 @@ capture name decls = do
 
     let nameTyDecl :: Dec
         nameTyDecl = SigD (mkName name) (ConT (mkName "String"))
-    
+
         nameDecl :: Dec
         nameDecl = ValD (VarP $ mkName name) (NormalB (LitE (StringL declsStr))) []
 
