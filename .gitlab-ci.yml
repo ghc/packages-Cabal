@@ -1,0 +1,18 @@
+variables:
+  # Commit of ghc/ci-images repository from which to pull Docker images
+  DOCKER_REV: 3f731f5d37a156e7ebe10cd32656946083baaf4a
+
+.build:
+  script:
+    - cabal update
+    - cabal v2-install cabal-install --installdir=$(pwd)/out --install-method=copy --overwrite-policy=always
+  artifacts:
+    expire_in: 2 week
+    paths:
+      - out
+
+build-x86_64-linux:
+  extends: .build
+  tags:
+    - x86_64-linux
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
